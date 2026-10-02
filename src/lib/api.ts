@@ -175,6 +175,25 @@ export const providers = {
   remove: (id: string) => request<{ removed: boolean }>(`/providers/${id}`, { method: "DELETE" }),
 };
 
+export interface VoiceRecord {
+  voiceId: string;
+  name: string;
+  category: string | null;
+  previewUrl: string | null;
+  labels: Record<string, string>;
+  availableForTiers: string[] | null;
+  unverified: boolean;
+}
+
+export const voices = {
+  list: () =>
+    request<{
+      voices: VoiceRecord[];
+      reason: string | null;
+      needsProvider?: boolean;
+    }>("/voices"),
+};
+
 export const jobs = {
   list: () => request<{ jobs: JobRecord[] }>("/jobs").then((r) => r.jobs),
 

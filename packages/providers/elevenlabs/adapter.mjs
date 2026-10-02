@@ -261,6 +261,49 @@ export class ElevenLabsAdapter {
   }
 
   /**
+   * Voice catalogue. Free, no generation, and it is how the TTS page can offer
+   * a picker instead of a raw id box.
+   *
+   * The payload shape is UNVERIFIED: it has never been fetched with a real
+   * credential. Parsing is defensive and an unrecognised shape yields an empty
+   * list plus a reason, never a fabricated voice.
+   *
+   * @param {string} key
+   */
+  async listVoices(key) {
+    const { data, requestId } = await this.#request({
+      method: "GET",
+      path: "/v1/voices",
+      key,
+    });
+
+    const list = Array.isArray(data) ? data : data?.voices;
+    if (!Array.isArray(list)) {
+      return {
+        voices: [],
+        reason: "音色列表响应结构未识别，未做猜测映射",
+        requestId,
+      };
+    }
+
+    return {
+      voices: list.map((v) => ({
+        voiceId: String(v?.voice_id ?? v?.id ?? ""),
+        name: String(v?.name ?? v?.voice_id ?? ""),
+        category: v?.category ?? null,
+        // The upstream preview path is a public URL shape; it is recorded, not
+        // fetched here, so an unverified field can never cause a request.
+        previewUrl: typeof v?.preview_url === "string" ? v.preview_url : null,
+        labels: Array.isArray(v?.labels) ? v.labels : {},
+        availableForTiers: v?.available_for_tiers ?? null,
+        unverified: true,
+      })).filter((v) => v.voiceId),
+      reason: null,
+      requestId,
+    };
+  }
+
+  /**
    * Text to speech — the first end-to-end BYOK path (API-02).
    *
    * @param {{ key: string, voiceId: string, text: string,

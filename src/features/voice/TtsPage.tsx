@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { VoicePicker } from "@/features/voice/VoicePicker";
 import {
   ApiError,
   assets as assetsApi,
@@ -343,17 +344,13 @@ export function TtsPage() {
       </section>
 
       {/* ---------------- voice ---------------- */}
-      <section className="stack gap-2">
-        <span className="text-sm text-secondary">音色</span>
-        <input
+      <section className="stack gap-3">
+        <h2 className="text-sm font-medium text-foreground">音色</h2>
+        <VoicePicker
           value={voiceId}
-          onChange={(e) => setVoiceId(e.target.value)}
-          placeholder="输入音色 ID（音色列表接口尚未接入）"
-          className="focus-ring h-9 rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none placeholder:text-subtle"
+          onChange={setVoiceId}
+          disabled={!provider || provider.validationState !== "available"}
         />
-        <p className="text-xs text-secondary">
-          音色搜索与筛选尚未接入；此处直接使用 API 音色 ID，不会静默替换成别的音色。
-        </p>
       </section>
 
       {/* ---------------- cost acknowledgement ---------------- */}

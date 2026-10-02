@@ -249,6 +249,34 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       }
     }
 
+    /* -- voices ------------------------------------------------------- */
+    if (urlPath === "/api/v1/voices" && req.method === "GET") {
+      const ids = vault.list().map((p) => p.id);
+      for (const id of ids) {
+        try {
+          const out = await providerAdapters.elevenlabs.listVoices(vault.useSecret(id));
+          return json(res, 200, {
+            voices: out.voices,
+            reason: out.reason,
+            providerRequestId: out.requestId,
+          });
+        } catch (err) {
+          log({ event: "voices.failed", id, code: err?.code ?? "?" });
+          return json(res, 200, {
+            voices: [],
+            // A failure is reported, not hidden behind an empty list.
+            reason: err?.safeMessage ?? "音色列表不可用",
+            error: { code: err?.code ?? "INTERNAL" },
+          });
+        }
+      }
+      return json(res, 200, {
+        voices: [],
+        reason: "尚未配置 Provider",
+        needsProvider: true,
+      });
+    }
+
     /* -- capabilities ------------------------------------------------ */
     if (urlPath === "/api/v1/capabilities" && req.method === "GET") {
       const ids = vault.list().map((p) => p.id);
