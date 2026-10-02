@@ -13,8 +13,16 @@
 | `page-tts.test.tsx` | 15 | TTS 页（HEAD 已实现）：无/未验证 Provider 门禁+引导链接、超限/近限文案、按模型的参数门禁（不支持参数禁用且不发送）、Pro 格式拦截、费用确认勾选独立门禁、提交 payload（intent 形状、不支持参数被丢弃）、JobPanel；VoicePicker：needsProvider/失败原因/搜索过滤/选中/已选音色消失告警（不自动替换） | routing.test.tsx 只断言每个路由渲染出不同 h1，无任何交互行为测试 |
 | `page-voice-tools.test.tsx` | 19 | STS 队列（非音频拒绝点名文件、50MB 网页观察上限、空态、blocked 链、upload→create→run、字节级重复复用）；人声分离（非音频、单文件、对比区、复用）；配音（文件→语言 blocked 链、语言数未核验声明、v1 无编辑器声明、提交 payload、远端项目 id）；YT 转写（yt-dlp 缺失门禁、权利+费用双确认、URL 去.trim 进 intent、转写渲染、复用） | 同上，无页面行为测试；api 模块在模块边界 mock（client 真实行为由 `tests/integration/client.test.mjs` 覆盖） |
 | `page-media.test.tsx` | 13 | 音效（空描述门禁、预设只填稿不提交、时长上限文案、payload、产物+会话历史、复用）；图像视频（`?modality=` 深链、需审批模型拦截+说明、切模式重置模型保留草稿、image_generation payload+img 渲染、异步 running 面板+取消范围诚实文案、复用） | 同上 |
+| `defect-regression.test.tsx` | 2 | **缺陷回归标记（极性反转）**：D-01 TTS create 后从不调 `jobs.run`；D-02 本地适配器无 `submitTextToSpeech`（TTS 被 dispatch 到 chat-only submit 假成功）。断言编码当前缺陷行为，带 ⚠️ FLIP WHEN FIXED 注释——修复落地即翻红，翻转极性后成为永久回归测试 | 缺陷 2026-10-03 基线验收发现（docs/qa/2026-10-03-baseline-browser.md），此前无任何测试锚定 |
+| `defect-regression-server.test.mjs` | 1 | **D-05 标记（真实 server）**：`GET /api/v1/session` 无条件 `sessions.issue()`，带活 cookie 再引导仍换新会话→双标签页 CSRF 403。同款极性反转约定 | 同上 |
 
-合计新增 **93** 用例。Studio/Flows/Chat/音乐/音色库为在途页面，按要求未测。
+## helpers/
+
+| 文件 | 用途 |
+|---|---|
+| `helpers/mock-openai-server.mjs` | OpenAI 兼容 mock（127.0.0.1，零外部调用）：`/v1/models`、`/v1/audio/speech`（程序生成合法 WAV）、`/v1/chat/completions`；CLI 模式 `node tests/qa/helpers/mock-openai-server.mjs [port]`（默认 5190），库模式 `startMockOpenAI({ port: 0 })` 返回 `{ port, seen, requests, close }`。复验 E2E 与 D-02 修复验证共用 |
+
+合计新增 **96** 用例（93 补缺 + 3 缺陷标记）。Studio/Flows/Chat/音乐/音色库为在途页面，按要求未测。
 
 ## 约定
 
