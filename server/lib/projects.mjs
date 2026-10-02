@@ -119,6 +119,44 @@ export class ProjectStore {
     });
   }
 
+  /**
+   * Derive a variant: same structure, a few variables swapped.
+   *
+   * This is the idea borrowed from open-source video-DSL projects such as
+   * hypit, where one workflow is re-run with different variables instead of
+   * being rebuilt. A variant is cheap because the structure and any already
+   * generated assets are reused; only the named variables change.
+   *
+   * Nothing is re-generated here — a variant is a project until someone runs
+   * it, and running it goes through the normal cost-confirmation path.
+   *
+   * @param {string} id
+   * @param {{ name?: string, variables?: Record<string, unknown>, assetRefs?: string[] }} opts
+   */
+  deriveVariant(id, { name, variables = {}, assetRefs } = {}) {
+    const src = this.get(id);
+    if (!src) throw new ReferenceError(`unknown project: ${id}`);
+
+    const base = src.content?.variables ?? {};
+    const merged = { ...base, ...variables };
+    const changed = Object.keys(variables).filter(
+      (k) => JSON.stringify(base[k]) !== JSON.stringify(variables[k]),
+    );
+
+    return this.create({
+      kind: src.kind,
+      name: name ?? `${src.name} 变体`,
+      content: {
+        ...src.content,
+        // Variables are named, not positional, so a variant survives the
+        // structure changing underneath it.
+        variables: merged,
+        derivedFrom: { id: src.id, revision: src.revision, changed },
+      },
+      assetRefs: assetRefs ?? src.assetRefs,
+    });
+  }
+
   rename(id, name) {
     return this.save(id, { name });
   }

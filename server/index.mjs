@@ -555,6 +555,22 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       return json(res, 201, { project: projects.create(body) });
     }
 
+    const projectVariant = urlPath.match(/^\/api\/v1\/projects\/([^/]+)\/variants$/);
+    if (projectVariant && req.method === "POST") {
+      const body = await readJsonBody(req);
+      const v = projects.deriveVariant(projectVariant[1], {
+        name: body.name,
+        variables: body.variables ?? {},
+      });
+      log({
+        event: "project.variant",
+        id: v.id,
+        from: projectVariant[1],
+        changed: v.content.derivedFrom?.changed?.length ?? 0,
+      });
+      return json(res, 201, { project: v });
+    }
+
     const projectDelete = urlPath.match(/^\/api\/v1\/projects\/([^/]+)$/);
     if (projectDelete && req.method === "DELETE") {
       // Deleting a project keeps its assets; the response says how many, so

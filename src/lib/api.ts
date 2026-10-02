@@ -313,6 +313,40 @@ export const assets = {
   },
 };
 
+export const projects = {
+  list: () => request<{ projects: ProjectRecord[] }>("/projects").then((r) => r.projects),
+
+  create: (input: { kind: string; name: string; content?: Record<string, unknown> }) =>
+    request<{ project: ProjectRecord }>("/projects", { method: "POST", body: input }).then(
+      (r) => r.project,
+    ),
+
+  /**
+   * Derive a variant: same structure, a few variables swapped. Reuses existing
+   * assets and does not re-run any generation.
+   */
+  deriveVariant: (id: string, variables: Record<string, unknown>, name?: string) =>
+    request<{ project: ProjectRecord }>(`/projects/${id}/variants`, {
+      method: "POST",
+      body: { variables, name },
+    }).then((r) => r.project),
+};
+
+export interface ProjectRecord {
+  id: string;
+  kind: string;
+  name: string;
+  revision: number;
+  schemaVersion: number | null;
+  content: Record<string, unknown> & {
+    variables?: Record<string, unknown>;
+    derivedFrom?: { id: string; revision: number; changed: string[] };
+  };
+  assetRefs: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const backup = {
   create: () => request<{ bundle: unknown; sha256: string }>("/backup", { method: "POST" }),
   validate: (bundle: unknown) =>
