@@ -77,6 +77,30 @@ export class StorageFullError extends Error {
   }
 }
 
+/** Content type -> extension, for naming a download with no filename. */
+const EXT_BY_TYPE = new Map([
+  ["audio/mpeg", ".mp3"],
+  ["audio/wav", ".wav"],
+  ["audio/mp4", ".m4a"],
+  ["audio/ogg", ".ogg"],
+  ["audio/flac", ".flac"],
+  ["video/mp4", ".mp4"],
+  ["video/webm", ".webm"],
+  ["image/png", ".png"],
+  ["image/jpeg", ".jpg"],
+  ["image/webp", ".webp"],
+  ["image/gif", ".gif"],
+  ["application/x-subrip", ".srt"],
+  ["text/vtt", ".vtt"],
+  ["application/json", ".json"],
+  ["text/plain", ".txt"],
+]);
+
+/** Build a filename that the asset store will accept, from a media type. */
+export function filenameFor(mediaType, base = "asset") {
+  return `${base}${EXT_BY_TYPE.get(mediaType) ?? ""}`;
+}
+
 export class AssetStore {
   #db;
   #root;

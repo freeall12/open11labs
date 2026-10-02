@@ -362,6 +362,18 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       });
     }
 
+    const jobPoll = urlPath.match(/^\/api\/v1\/jobs\/([^/]+)\/poll$/);
+    if (jobPoll && req.method === "POST") {
+      const out = await runner.poll(jobPoll[1]);
+      return json(res, out.ok ? 200 : 202, {
+        job: out.job,
+        asset: out.asset ?? null,
+        reason: out.reason ?? null,
+        stillRunning: out.stillRunning ?? false,
+        remoteSucceeded: out.remoteSucceeded ?? false,
+      });
+    }
+
     /* -- cost --------------------------------------------------------- */
     if (urlPath === "/api/v1/cost" && req.method === "GET") {
       return json(res, 200, { summary: cost.summary(), budget: cost.budget(), scope: cost.budgetScope() });

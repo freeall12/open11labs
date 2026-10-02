@@ -22,6 +22,7 @@
        reported/unknown, never as zero
    ========================================================================== */
 
+import { filenameFor } from "./assets.mjs";
 import { normalizedError } from "../../packages/contracts/src/index.mjs";
 
 /** What a provider adapter must hand back for a successful synchronous job. */
@@ -108,6 +109,20 @@ export class JobRunner {
 
     try {
       const out = await this.#dispatch(adapter, job, key);
+
+      // Asynchronous first: an async submit has no artifact yet, and
+      // assertArtifact would reject it as a failure.
+      if (out.async) {
+        this.#jobs.transition(jobId, "running");
+        // The remote id is what a poll — or a restart — will resume from.
+        this.#jobs.recordRequestId(jobId, out.remoteId);
+        return {
+          ok: true,
+          job: this.#jobs.get(jobId),
+          pendingRemote: out.remoteId,
+        };
+      }
+
       const artifact = assertArtifact(out.artifact);
 
       // Prove acceptance before anything else: this id is what a later query
@@ -120,7 +135,7 @@ export class JobRunner {
 
       const imported = await this.#assets.put({
         bytes: artifact.bytes,
-        displayName: artifact.suggestedName ?? `job-${jobId}.mp3`,
+        displayName: artifact.suggestedName ?? filenameFor(artifact.contentType, `job-${jobId}`),
         mediaType: artifact.contentType,
         origin: "generated",
         sourceJobId: jobId,
@@ -150,6 +165,150 @@ export class JobRunner {
     }
   }
 
+  /**
+   * Poll an async job that is already running.
+   *
+   * Uses the stored remote id, so a restart resumes polling rather than
+   * starting a new generation. An unrecognised remote status leaves the job
+   * running and reports what was seen, rather than declaring it finished.
+   *
+   * @param {string} jobId
+   */
+  async poll(jobId) {
+    const job = this.#jobs.get(jobId);
+    if (!job) return { ok: false, job: null, reason: "unknown job" };
+    if (job.status !== "running" && job.status !== "cancel_requested") {
+      return { ok: false, job, reason: `任务处于 ${job.status}，不进行轮询` };
+    }
+    if (!job.requestId) {
+      return { ok: false, job, reason: "缺少远端任务 id，无法安全轮询" };
+    }
+
+    const adapter = this.#adapters[job.providerId];
+    if (!adapter?.pollStatus) {
+      return { ok: false, job, reason: "该 Provider 未实现轮询" };
+    }
+
+    let key;
+    try {
+      key = this.#vault.useSecret(job.credentialRef);
+    } catch {
+      return this.#fail(job, {
+        code: "AUTH_REQUIRED",
+        safeMessage: "引用的密钥已不存在，无法继续轮询",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+
+    let out;
+    try {
+      out = await adapter.pollStatus({ key, remoteId: job.requestId });
+    } catch (err) {
+      // A failed poll says nothing about the generation itself.
+      return {
+        ok: false,
+        job,
+        reason: err?.safeMessage ?? "轮询失败",
+        pollError: true,
+      };
+    }
+
+    if (out.state === "running") {
+      return { ok: false, job, reason: "远端仍在处理", stillRunning: true };
+    }
+
+    if (out.state === "unknown") {
+      // Not an error, and definitely not a success.
+      return { ok: false, job, reason: "远端返回了未识别的状态，保持运行中待确认" };
+    }
+
+    if (out.state === "failed") {
+      const failed = this.#jobs.transition(jobId, "failed", {
+        error: {
+          code: "PROVIDER_REJECTED",
+          safeMessage: out.errorMessage ?? "远端任务失败",
+          retryable: false,
+          submissionCertainty: "accepted",
+          providerRequestId: job.requestId,
+        },
+      });
+      this.#cost.record({
+        jobId,
+        providerId: job.providerId,
+        state: "unknown",
+        source: "远端任务失败，实际费用未知",
+      });
+      return { ok: false, job: failed, reason: out.errorMessage ?? "远端任务失败" };
+    }
+
+    // completed — fetch the artifact through the adapter so the URL is
+    // resolved server-side with the key, never by the browser.
+    if (!out.artifactUrl) {
+      const stuck = this.#jobs.transition(jobId, "unknown_submission", {
+        error: {
+          code: "SUBMISSION_UNKNOWN",
+          safeMessage: "远端称任务完成，但未返回可取回的产物地址",
+          retryable: false,
+          submissionCertainty: "unknown",
+          providerRequestId: job.requestId,
+        },
+      });
+      return { ok: false, job: stuck, reason: "远端称完成但无产物地址" };
+    }
+
+    return this.#ingest(job, adapter, key, out.artifactUrl);
+  }
+
+  /** Download a finished remote artifact into the local asset store. */
+  async #ingest(job, adapter, key, artifactUrl) {
+    let artifact;
+    try {
+      artifact = assertArtifact(
+        await adapter.fetchArtifact({ key, url: artifactUrl }),
+      );
+    } catch (err) {
+      // The remote generation succeeded; only the local import failed. Those
+      // are two separate facts and the UI must be able to show both.
+      const partial = this.#jobs.transition(job.id, "failed", {
+        error: {
+          code: "ASSET_IMPORT_FAILED",
+          safeMessage: "远端已生成成功，但产物下载或导入失败，可重新下载同一结果，无需重新生成",
+          retryable: true,
+          submissionCertainty: "accepted",
+          providerRequestId: job.requestId,
+        },
+      });
+      return {
+        ok: false,
+        job: partial,
+        reason: "远端成功，本地导入失败",
+        remoteSucceeded: true,
+      };
+    }
+
+    const imported = await this.#assets.put({
+      bytes: artifact.bytes,
+      displayName: artifact.suggestedName ?? filenameFor(artifact.contentType, `job-${job.id}`),
+      mediaType: artifact.contentType,
+      origin: "generated",
+      sourceJobId: job.id,
+      licenseSource: "用户自有 Provider 生成的产物",
+    });
+
+    this.#cost.record({
+      jobId: job.id,
+      providerId: job.providerId,
+      state: "unknown",
+      source: "异步任务完成，价格未核验",
+    });
+
+    const done = this.#jobs.transition(job.id, "succeeded", {
+      outputAssetIds: [imported.asset.id],
+    });
+    return { ok: true, job: done, asset: imported.asset };
+  }
+
   async #dispatch(adapter, job, key) {
     switch (job.type) {
       case "text_to_speech":
@@ -161,6 +320,18 @@ export class JobRunner {
           outputFormat: job.input.outputFormat,
           params: job.input.params,
         });
+      case "image_generation":
+      case "video_generation": {
+        // Answers immediately with a remote id; the caller polls afterwards.
+        const out = await adapter.submitAsync({
+          key,
+          prompt: job.input.prompt,
+          modelId: job.modelId ?? undefined,
+          imageUrl: job.input.imageUrl,
+          durationSeconds: job.input.durationSeconds,
+        });
+        return { async: true, ...out };
+      }
       default:
         throw normalizedError({
           code: "CAPABILITY_UNAVAILABLE",

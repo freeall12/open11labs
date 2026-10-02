@@ -353,6 +353,74 @@ export class ElevenLabsAdapter {
     };
   }
 
+  /**
+   * Image and video are asynchronous: the create call answers with
+   * `{id, status:"pending"}` and the result has to be polled (API-07/08).
+   *
+   * The state mapping is written defensively because no authenticated response
+   * has been seen. An unrecognised status becomes `unknown` rather than
+   * `completed`, so a typo cannot be read as a finished job.
+   */
+  async submitAsync({ key, prompt, modelId, imageUrl, durationSeconds }) {
+    const payload = { prompt };
+    if (modelId) payload.model_id = modelId;
+    if (imageUrl) payload.image_url = imageUrl;
+    if (typeof durationSeconds === "number") payload.duration_seconds = durationSeconds;
+
+    const { data, requestId } = await this.#request({
+      method: "POST",
+      path: "/v1/flows/image",
+      key,
+      body: JSON.stringify(payload),
+      headers: { "content-type": "application/json" },
+    });
+
+    const remoteId = data?.id ?? data?.request_id ?? null;
+    const status = String(data?.status ?? "").toLowerCase();
+
+    if (!remoteId) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "供应商未返回任务 id，无法轮询",
+        retryable: false,
+        submissionCertainty: "unknown",
+        providerRequestId: requestId,
+      });
+    }
+
+    return {
+      remoteId: String(remoteId),
+      // Unknown statuses stay unknown; they never default to "done".
+      state: mapRemoteStatus(status),
+      requestId,
+    };
+  }
+
+  /**
+   * Poll an async task. `getArtifact` is only reachable once the remote says
+   * the job is finished.
+   */
+  async pollStatus({ key, remoteId }) {
+    const { data, requestId } = await this.#request({
+      method: "GET",
+      path: `/v1/flows/image/${encodeURIComponent(remoteId)}`,
+      key,
+    });
+
+    const state = mapRemoteStatus(String(data?.status ?? "").toLowerCase());
+
+    return {
+      state,
+      requestId,
+      // The finished-artifact URL is recorded, never fetched on the caller's
+      // behalf here — a second authenticated request is a separate decision.
+      artifactUrl: state === "completed" && typeof data?.url === "string"
+        ? data.url
+        : null,
+      errorMessage: state === "failed" ? String(data?.error ?? "供应商任务失败") : null,
+    };
+  }
+
   /** Synchronous TTS has nothing to poll. */
   async getStatus() {
     throw normalizedError({
@@ -426,6 +494,31 @@ export class ElevenLabsAdapter {
       submissionCertainty: raw.status >= 500 ? "unknown" : "not_submitted",
       providerRequestId: raw.requestId ?? null,
     });
+  }
+}
+
+/**
+ * Remote status -> local state. Anything unrecognised is `unknown`; it is
+ * never optimistically read as `completed`.
+ */
+function mapRemoteStatus(status) {
+  switch (status) {
+    case "pending":
+    case "queued":
+    case "processing":
+    case "in_progress":
+      return "running";
+    case "completed":
+    case "succeeded":
+    case "done":
+      return "completed";
+    case "failed":
+    case "error":
+    case "cancelled":
+    case "canceled":
+      return "failed";
+    default:
+      return "unknown";
   }
 }
 
