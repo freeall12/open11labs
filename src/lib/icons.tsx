@@ -215,3 +215,27 @@ export function IconSoundFx(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconKey(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M11.625 10.688a4.313 4.313 0 1 0-4.184-3.265l-4.409 4.409a.75.75 0 0 0-.22.53v2.076c0 .414.336.75.75.75h2.076a.75.75 0 0 0 .53-.22l.77-.77v-2.01h2.01l1.63-1.629q.504.128 1.047.129" /><path stroke="currentColor" stroke-linecap="square" d="M12.938 6.375a1.312 1.312 0 1 1-2.625 0 1.312 1.312 0 0 1 2.624 0Z" />
+    </Svg>
+  );
+}
+
+export function IconDatabase(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" d="M2.063 5.813a2.25 2.25 0 0 1 2.25-2.25h9.375a2.25 2.25 0 0 1 2.25 2.25V9H2.063zm0 3.187h13.875v3.188a2.25 2.25 0 0 1-2.25 2.25H4.313a2.25 2.25 0 0 1-2.25-2.25z" /><path fill="currentColor" stroke="currentColor" stroke-width="1" d="M4.875 11.156a.563.563 0 1 1 0 1.125.563.563 0 0 1 0-1.125Zm0-5.437a.563.563 0 1 1 0 1.125.563.563 0 0 1 0-1.125Z" />
+    </Svg>
+  );
+}
+
+export function IconQueue(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8.81299 12.188H15.187M8.81399 5.81199H15.188M2.81299 6.46999L4.06299 7.31299L6.56299 3.93799M2.81299 13.22L4.06299 14.064L6.56299 10.688" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+    </Svg>
+  );
+}

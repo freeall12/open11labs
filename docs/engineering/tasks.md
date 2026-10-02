@@ -5,7 +5,7 @@
 | 阶段/ID | 责任/写范围 | 依赖 | 输出/门禁 | 状态 |
 |---|---|---|---|---|
 | M0-T01 | RESEARCH：私有research、公开研究摘要 | 无 | 补创作缺失页/编辑器、冻结裁剪视觉基准；不访问账户/营销，无付费操作 | 待领取 |
-| M0-T02 | CORE：App/router、共享契约、根配置 | 无 | 真路由/404、本地配置入口、所有excluded菜单移除、UI控件清单 | 待领取 |
+| M0-T02 | CORE：App/router、共享契约、根配置 | 无 | 真路由/404、本地配置入口、所有excluded菜单移除、UI控件清单 | **进行中**：路由与范围裁剪已落地并有测试；控件清单待补 |
 | M0-T03 | CORE/SECURITY：server/vault/会话 | T02 | loopback/Origin/Host/CSRF、write-only钥匙、安全负例 | 待领取 |
 | M1-T04 | PROVIDER：packages/providers、服务适配 | T03 | ElevenLabs认证/能力/TTS，契约fixture/错误、版本与资料证据 | 待领取 |
 | M1-T05 | CORE：任务/队列/成本 | T03/T04 | 持久job、去重/未知/取消、成本状态，不自动重复收费 | 待领取 |

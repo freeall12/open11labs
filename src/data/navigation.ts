@@ -2,9 +2,12 @@ import type { ComponentType, SVGProps } from "react";
 import {
   IconAssets,
   IconChat,
+  IconDatabase,
   IconFlows,
   IconHome,
+  IconKey,
   IconLibrary,
+  IconQueue,
   IconStudio,
 } from "@/lib/icons";
 
@@ -44,4 +47,20 @@ export const PINNED_NAV: NavItem[] = [
   { label: "语音转文本", href: "/app/speech-to-text", icon: IconStudio },
   { label: "配音", href: "/app/dubbing", icon: IconStudio },
   { label: "有声书", href: "/app/audiobooks", icon: IconStudio },
+];
+
+/**
+ * Local BYOK configuration. SCOPE.md keeps local provider/key, storage and
+ * job settings because the local build cannot run without them — but it drops
+ * the upstream account, workspace, subscription and developer-portal surfaces.
+ * These entries are additions, not replicas.
+ */
+export const LOCAL_NAV: NavItem[] = [
+  {
+    label: "Provider 与密钥",
+    href: "/local/settings/providers",
+    icon: IconKey,
+  },
+  { label: "存储设置", href: "/local/settings/storage", icon: IconDatabase },
+  { label: "任务队列", href: "/local/jobs", icon: IconQueue },
 ];

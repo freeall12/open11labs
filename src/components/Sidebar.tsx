@@ -1,4 +1,4 @@
-import { PINNED_NAV, PRIMARY_NAV, type NavItem } from "@/data/navigation";
+import { LOCAL_NAV, PINNED_NAV, PRIMARY_NAV, type NavItem } from "@/data/navigation";
 import { IconMore } from "@/lib/icons";
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -57,6 +57,17 @@ export function Sidebar({ open }: { open: boolean }) {
                       item={item}
                       active={item.label === "主页"}
                     />
+                  ))}
+                </ul>
+              </li>
+
+              <li aria-label="本地配置">
+                <h2 className="mb-1.5 ml-1.5 whitespace-nowrap text-sm font-medium text-secondary opacity-0 transition-opacity duration-150 group-aria-expanded/sidebar:opacity-100">
+                  本地配置
+                </h2>
+                <ul className="stack cursor-default gap-1">
+                  {LOCAL_NAV.map((item) => (
+                    <NavLink key={item.href} item={item} active={false} />
                   ))}
                 </ul>
               </li>

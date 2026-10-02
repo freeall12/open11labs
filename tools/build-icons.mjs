@@ -46,6 +46,10 @@ const ICONS = {
   IconGrid: "GridBoxIcon",
   // Recents row thumbnails
   IconSoundFx: "SoundFxIcon",
+  // Local BYOK configuration entries
+  IconKey: "KeyIcon",
+  IconDatabase: "ServerIcon",
+  IconQueue: "ChecklistIcon",
 };
 
 const BUNDLES = [join(root, "tools/icons-bundle.js"), join(root, "tools/nav-bundle.js")];
