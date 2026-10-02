@@ -1,6 +1,7 @@
 import { PageFrame } from "@/features/shared/PageFrame";
 import { routeById } from "@/app/route-manifest";
 import type { RouteEntry } from "@/app/route-manifest";
+import { TtsPage as TtsPageBody } from "@/features/voice/TtsPage";
 
 /* ==========================================================================
    VOICE module — voice library, cloning/design, TTS, STS, STT, isolation,
@@ -16,6 +17,13 @@ function page(id: string) {
   };
 }
 
+/** TTS is the first BYOK page and has a real implementation. */
+export function TtsPage() {
+  const route = routeById("tts");
+  if (!route) throw new Error("unknown route: tts");
+  return <PageFrame route={route}><TtsPageBody /></PageFrame>;
+}
+
 export const VoiceLibraryPage = page("voices-explore");
 export const VoiceCreatePage = page("voice-create-query");
 export const InstantClonePage = page("instant-clone");
@@ -23,7 +31,6 @@ export const VoiceDesignPage = page("voice-design");
 export const CreateVoiceAliasPage = page("voice-create-alias");
 export const MyVoicesPage = page("my-voices");
 export const VoiceCollectionPage = page("voice-collection");
-export const TtsPage = page("tts");
 export const StsPage = page("sts");
 export const IsolatorPage = page("isolator");
 export const SttPage = page("stt");

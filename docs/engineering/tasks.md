@@ -10,7 +10,7 @@
 | M1-T04 | PROVIDER：packages/providers、服务适配 | T03 | ElevenLabs认证/能力/TTS，契约fixture/错误、版本与资料证据 | **部分完成**：适配器/契约/fixture/43项测试已落地；能力全部标 unverified，待真实密钥验证 |
 | M1-T05 | CORE：任务/队列/成本 | T03/T04 | 持久job、去重/未知/取消、成本状态，不自动重复收费 | **已完成**：SQLite 持久化 + 42 项测试，含跨重启恢复（2026-10-03） |
 | M1-T06 | STORAGE：server/storage、src/features/assets | T03/T05 | 素材/工程/历史、导出/备份、重启恢复、无账户过滤 | **部分完成**：服务端存储/工程/备份 + 23 项测试；前端素材页未做 |
-| M1-T07 | SHELL/VOICE：首页/壳/TTS/播放器 | T02/T04/T05/T06 | 真正首条BYOK端到端；同条件视觉diff，无营销/头像 | 待领取 |
+| M1-T07 | SHELL/VOICE：首页/壳/TTS/播放器 | T02/T04/T05/T06 | 真正首条BYOK端到端；同条件视觉diff，无营销/头像 | **进行中**：TTS 页面与状态门禁已完成；真实提交/播放/下载待密钥与预算 |
 | M2-T08 | VOICE：voice/stt/sts/dubbing/isolation | T04/T05/T06，补采 | 各工具页面/参数/真实公开能力与错误/历史/下载 | 待领取 |
 | M2-T09 | MEDIA：sfx/music/image/video/lipsync/avatar | T04/T05/T06，补采 | 模型专属schema、异步任务/产物、无市场/订阅/公开销售 | 待领取 |
 | M3-T10 | EDITORS：Studio/Flows/聊天 | T06/T08/T09，LLM适配 | 本地工程/时间线/DAG/修订/导出，Agent权限和成本确认 | 待领取 |
