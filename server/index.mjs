@@ -34,6 +34,7 @@ import { JobStore } from "./lib/jobs.mjs";
 import { CostLedger } from "./lib/cost.mjs";
 import { AssetStore } from "./lib/assets.mjs";
 import { ProjectStore, RevisionConflictError } from "./lib/projects.mjs";
+import { JobRunner } from "./lib/runner.mjs";
 import { buildBundle, validateBundle, writeBundle } from "./lib/backup.mjs";
 
 const MIME = {
@@ -347,6 +348,18 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
     const jobEvents = urlPath.match(/^\/api\/v1\/jobs\/([^/]+)\/events$/);
     if (jobEvents && req.method === "GET") {
       return json(res, 200, { events: jobs.events(jobEvents[1]) });
+    }
+
+    const jobRun = urlPath.match(/^\/api\/v1\/jobs\/([^/]+)\/run$/);
+    if (jobRun && req.method === "POST") {
+      // Explicit, single-step execution. The duplicate-charge guard inside the
+      // runner is what makes a double click safe here.
+      const out = await runner.run(jobRun[1]);
+      return json(res, out.ok ? 200 : 409, {
+        job: out.job,
+        asset: out.asset ?? null,
+        reason: out.reason ?? null,
+      });
     }
 
     /* -- cost --------------------------------------------------------- */
