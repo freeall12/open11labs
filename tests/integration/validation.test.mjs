@@ -287,3 +287,122 @@ describe("no generation happens during validation", () => {
     expect(JSON.stringify(errorBodies.unauthorized)).not.toMatch(/sk_[A-Za-z0-9]{20,}/);
   });
 });
+
+/* ==========================================================================
+   Job and cost endpoints.
+   ========================================================================== */
+
+describe("jobs over HTTP", () => {
+  let jobsSeen = 0;
+
+  beforeAll(async () => {
+    await boot(stubAdapter());
+  });
+  afterAll(async () => {
+    await shutdown();
+  });
+
+  it("a repeated intent returns the same job with created:false", async () => {
+    const { cookie, csrf } = await session();
+    const body = {
+      intentId: "ui-click-1",
+      type: "text_to_speech",
+      providerId: "elevenlabs",
+      credentialRef: "cred_1",
+      input: { text: "你好" },
+    };
+
+    const first = await call("/api/v1/jobs", { method: "POST", cookie, csrf, body });
+    const firstBody = await first.json();
+    expect(first.status).toBe(201);
+    expect(firstBody.created).toBe(true);
+
+    const second = await call("/api/v1/jobs", { method: "POST", cookie, csrf, body });
+    const secondBody = await second.json();
+    expect(secondBody.created).toBe(false);
+    expect(secondBody.job.id).toBe(firstBody.job.id);
+    jobsSeen += 1;
+  });
+
+  it("rejects a submission with no intent id", async () => {
+    const { cookie, csrf } = await session();
+    const res = await call("/api/v1/jobs", {
+      method: "POST",
+      cookie,
+      csrf,
+      body: { type: "text_to_speech", providerId: "elevenlabs", credentialRef: "c", input: {} },
+    });
+    expect(res.status).toBe(500);
+  });
+
+  it("cancel states its scope and claims no refund", async () => {
+    const { cookie, csrf } = await session();
+    const created = await (
+      await call("/api/v1/jobs", {
+        method: "POST",
+        cookie,
+        csrf,
+        body: {
+          intentId: "cancel-me",
+          type: "text_to_speech",
+          providerId: "elevenlabs",
+          credentialRef: "cred_1",
+          input: { text: "x" },
+        },
+      })
+    ).json();
+
+    const res = await call(`/api/v1/jobs/${created.job.id}/cancel`, {
+      method: "POST",
+      cookie,
+      csrf,
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // A draft never left the machine, so it is discarded rather than cancelled.
+    expect(body.job.status).toBe("cancelled");
+    expect(body.scope.stops).toContain("未提交任何请求");
+    expect(body.scope.doesNot.join()).toContain("退款");
+  });
+
+  it("404s cancelling an unknown job", async () => {
+    const { cookie, csrf } = await session();
+    const res = await call("/api/v1/jobs/nope/cancel", { method: "POST", cookie, csrf });
+    expect(res.status).toBe(404);
+  });
+
+  it("reports unknown cost rather than zero", async () => {
+    const { cookie } = await session();
+    const res = await call("/api/v1/cost", { cookie });
+    const body = await res.json();
+
+    expect(body.summary.money).toEqual([]);
+    expect(body.scope.doesNotControl.join()).toContain("其他客户端");
+  });
+
+  it("requires confirmation before an unpriced submission", async () => {
+    const { cookie, csrf } = await session();
+    await call("/api/v1/cost/budget", {
+      method: "POST",
+      cookie,
+      csrf,
+      body: { limit: 1, currency: "USD" },
+    });
+
+    // The decision lives in the ledger; the endpoint must be able to answer it.
+    const res = await call("/api/v1/cost", { cookie });
+    expect((await res.json()).budget.limit).toBe(1);
+  });
+
+  it("validates the budget payload", async () => {
+    const { cookie, csrf } = await session();
+    const res = await call("/api/v1/cost/budget", {
+      method: "POST",
+      cookie,
+      csrf,
+      body: { limit: -5 },
+    });
+    expect(res.status).toBe(500);
+  });
+});

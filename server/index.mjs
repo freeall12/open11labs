@@ -27,6 +27,9 @@ import {
 } from "./lib/security.mjs";
 import { Vault, toPublic } from "./lib/vault.mjs";
 import * as providers from "../packages/providers/elevenlabs/adapter.mjs";
+import { openDb, getSetting, setSetting } from "./lib/db.mjs";
+import { JobStore } from "./lib/jobs.mjs";
+import { CostLedger } from "./lib/cost.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -138,7 +141,7 @@ function serveStatic(root, urlPath, res) {
 
 /* ----------------------------------------------------------------- api -- */
 
-function createApi({ vault, sessions, log, providerAdapters = providers, port }) {
+function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost }) {
   return async function handleApi(req, res, urlPath) {
     /* -- session bootstrap ------------------------------------------- */
     if (urlPath === "/api/v1/session" && req.method === "GET") {
@@ -258,6 +261,67 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port })
       return json(res, 200, { capabilities: out });
     }
 
+    /* -- jobs --------------------------------------------------------- */
+    if (urlPath === "/api/v1/jobs" && req.method === "GET") {
+      return json(res, 200, { jobs: jobs.list() });
+    }
+
+    if (urlPath === "/api/v1/jobs" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      // The client supplies an intent id; the UNIQUE index is what actually
+      // prevents a double-click from becoming a second paid submission.
+      const { job, created } = jobs.createOrGet({
+        intentId: body.intentId,
+        type: body.type,
+        providerId: body.providerId,
+        modelId: body.modelId,
+        credentialRef: body.credentialRef,
+        input: body.input,
+      });
+      log({ event: created ? "job.created" : "job.deduped", id: job.id });
+      return json(res, created ? 201 : 200, { job, created });
+    }
+
+    const jobCancel = urlPath.match(/^\/api\/v1\/jobs\/([^/]+)\/cancel$/);
+    if (jobCancel && req.method === "POST") {
+      const job = jobs.get(jobCancel[1]);
+      if (!job) {
+        return json(res, 404, { error: { code: "NOT_FOUND", message: "unknown job" } });
+      }
+      const decision = jobs.canSubmit(job);
+      // Nothing has left the machine, so a draft is simply discarded. Only a
+      // job that was on its way needs a cancel request.
+      const to = job.status === "draft" ? "cancelled" : "cancel_requested";
+      const updated = jobs.transition(job.id, to, {
+        cancelRequestedAt: new Date().toISOString(),
+      });
+      // Cancelling stops local waiting. It is not a refund and it does not
+      // claim the provider stopped working.
+      return json(res, 200, {
+        job: updated,
+        scope: {
+          stops: to === "cancelled" ? "本地草稿，未提交任何请求" : "本地等待",
+          doesNot: ["供应商侧撤销", "退款", "已产生费用的返还"],
+          note: decision.ok ? null : decision.reason,
+        },
+      });
+    }
+
+    const jobEvents = urlPath.match(/^\/api\/v1\/jobs\/([^/]+)\/events$/);
+    if (jobEvents && req.method === "GET") {
+      return json(res, 200, { events: jobs.events(jobEvents[1]) });
+    }
+
+    /* -- cost --------------------------------------------------------- */
+    if (urlPath === "/api/v1/cost" && req.method === "GET") {
+      return json(res, 200, { summary: cost.summary(), budget: cost.budget(), scope: cost.budgetScope() });
+    }
+
+    if (urlPath === "/api/v1/cost/budget" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return json(res, 200, { budget: cost.setBudget(body) });
+    }
+
     /* -- vault health ------------------------------------------------ */
     if (urlPath === "/api/v1/vault" && req.method === "GET") {
       return json(res, 200, {
@@ -277,15 +341,30 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port })
 
 /* ------------------------------------------------------------- server -- */
 
-export function createLocalServer({ root, vault, port: listenPort, log = safeLog, providerAdapters }) {
+export function createLocalServer({
+  root,
+  vault,
+  port: listenPort,
+  dbPath = ":memory:",
+  log = safeLog,
+  providerAdapters,
+}) {
   const sessions = new SessionStore();
+  const db = openDb(dbPath);
+  const jobs = new JobStore({ db });
+  const cost = new CostLedger({ db });
+
+  // Anything caught mid-submit by a previous process is unresolvable until
+  // someone checks upstream. Mark it before accepting new work.
+  const reconciled = jobs.reconcileAfterRestart();
+  if (reconciled) log({ event: "jobs.reconciled", count: reconciled });
 
   // The listener may bind an ephemeral port (0), so the Host allowlist cannot
   // be frozen at construction. One mutable value, shared by both closures.
   let actualPort = listenPort;
   const port = () => actualPort;
 
-  const api = createApi({ vault, sessions, log, providerAdapters, port });
+  const api = createApi({ vault, sessions, log, providerAdapters, port, jobs, cost });
 
   const server = createServer(async (req, res) => {
     const urlPath = (req.url ?? "/").split("?")[0];
@@ -317,6 +396,10 @@ export function createLocalServer({ root, vault, port: listenPort, log = safeLog
     sessions,
     vault,
     /** Call after listen() when binding port 0, so Host checks use the real port. */
+    /** Exposed for tests and for the CLI's startup summary. */
+    jobs,
+    cost,
+    db,
     adoptActualPort() {
       const addr = server.address();
       if (addr && typeof addr === "object") actualPort = addr.port;

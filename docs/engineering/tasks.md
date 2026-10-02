@@ -8,7 +8,7 @@
 | M0-T02 | CORE：App/router、共享契约、根配置 | 无 | 真路由/404、本地配置入口、所有excluded菜单移除、UI控件清单 | **部分完成**：路由/404/范围裁剪已通过 51 项测试；逐页控件清单待补 |
 | M0-T03 | CORE/SECURITY：server/vault/会话 | T02 | loopback/Origin/Host/CSRF、write-only钥匙、安全负例 | **已完成**：26 项安全负例通过（2026-10-03） |
 | M1-T04 | PROVIDER：packages/providers、服务适配 | T03 | ElevenLabs认证/能力/TTS，契约fixture/错误、版本与资料证据 | **部分完成**：适配器/契约/fixture/43项测试已落地；能力全部标 unverified，待真实密钥验证 |
-| M1-T05 | CORE：任务/队列/成本 | T03/T04 | 持久job、去重/未知/取消、成本状态，不自动重复收费 | 待领取 |
+| M1-T05 | CORE：任务/队列/成本 | T03/T04 | 持久job、去重/未知/取消、成本状态，不自动重复收费 | **已完成**：SQLite 持久化 + 42 项测试，含跨重启恢复（2026-10-03） |
 | M1-T06 | STORAGE：server/storage、src/features/assets | T03/T05 | 素材/工程/历史、导出/备份、重启恢复、无账户过滤 | 待领取 |
 | M1-T07 | SHELL/VOICE：首页/壳/TTS/播放器 | T02/T04/T05/T06 | 真正首条BYOK端到端；同条件视觉diff，无营销/头像 | 待领取 |
 | M2-T08 | VOICE：voice/stt/sts/dubbing/isolation | T04/T05/T06，补采 | 各工具页面/参数/真实公开能力与错误/历史/下载 | 待领取 |

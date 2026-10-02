@@ -43,13 +43,19 @@ if (!existsSync(root)) {
 }
 
 const vault = new Vault({ masterPassword });
-const { server } = createLocalServer({ root, vault, port });
+const { server, jobs } = createLocalServer({
+  root,
+  vault,
+  port,
+  dbPath: join(dataDir, "db", "meta.db"),
+});
 
 server.listen(port, "127.0.0.1", () => {
   console.log(`open11labs local server  http://127.0.0.1:${port}`);
   console.log(`  web root : ${root}`);
   console.log(`  data dir : ${dataDir}`);
   console.log(`  vault    : ${vault.isPersistent ? "encrypted at rest" : "memory only (restart clears keys)"}`);
+  console.log(`  jobs db  : ${join(dataDir, "db", "meta.db")}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {
