@@ -600,6 +600,62 @@ export class ElevenLabsAdapter {
     };
   }
 
+  /**
+   * Speech to text — API-03, `POST /v1/speech-to-text`, multipart.
+   *
+   * Unlike the audio endpoints this one answers with JSON, not bytes, so the
+   * artifact is synthesised locally from the returned transcript.
+   */
+  async submitStt({ key, audio, fileName, modelId, languageCode, options }) {
+    if (!audio || !(audio instanceof Uint8Array) || audio.byteLength === 0) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请先上传或录制音频",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+
+    const form = new FormData();
+    form.set("model_id", modelId ?? "scribe_v1");
+    if (languageCode && languageCode !== "auto") form.set("language_code", languageCode);
+    for (const [k, v] of Object.entries(options ?? {})) {
+      if (v === undefined || v === null || v === "") continue;
+      form.set(k, String(v));
+    }
+    form.set("audio", new Blob([audio], { type: "audio/mpeg" }), fileName ?? "input.mp3");
+
+    const { data, requestId } = await this.#request({
+      method: "POST",
+      path: "/v1/speech-to-text",
+      key,
+      body: form,
+    });
+
+    const text = typeof data?.text === "string" ? data.text : "";
+    if (!text) {
+      // An empty transcript is not a successful transcription.
+      throw normalizedError({
+        code: "PROVIDER_REJECTED",
+        safeMessage: "供应商返回了空转录",
+        retryable: false,
+        submissionCertainty: "accepted",
+        providerRequestId: requestId,
+      });
+    }
+
+    return {
+      // The transcript is a text artifact; it is stored like any other asset.
+      transcript: {
+        text,
+        languageCode: data?.language_code ?? null,
+        words: Array.isArray(data?.words) ? data.words.length : null,
+        characters: Array.isArray(data?.characters) ? data.characters.length : null,
+      },
+      providerRequestId: requestId,
+    };
+  }
+
   /** Synchronous TTS has nothing to poll. */
   async getStatus() {
     throw normalizedError({

@@ -110,6 +110,35 @@ export class JobRunner {
     try {
       const out = await this.#dispatch(adapter, job, key);
 
+      // Transcription answers with text rather than media, so the artifact is
+      // built from the returned transcript instead of downloaded.
+      if (out.transcript) {
+        if (out.providerRequestId) {
+          this.#jobs.recordRequestId(jobId, out.providerRequestId);
+        }
+        this.#jobs.transition(jobId, "running");
+        const json = new TextEncoder().encode(
+          JSON.stringify(out.transcript, null, 2),
+        );
+        const imported = await this.#assets.put({
+          bytes: json,
+          displayName: `transcript-${jobId}.json`,
+          mediaType: "application/json",
+          origin: "generated",
+          sourceJobId: jobId,
+        });
+        this.#cost.record({
+          jobId,
+          providerId: job.providerId,
+          state: "unknown",
+          source: "转录完成，价格未核验",
+        });
+        const done = this.#jobs.transition(jobId, "succeeded", {
+          outputAssetIds: [imported.asset.id],
+        });
+        return { ok: true, job: done, asset: imported.asset, transcript: out.transcript };
+      }
+
       // Asynchronous first: an async submit has no artifact yet, and
       // assertArtifact would reject it as a failure.
       if (out.async) {
@@ -311,6 +340,25 @@ export class JobRunner {
 
   async #dispatch(adapter, job, key) {
     switch (job.type) {
+      case "speech_to_text": {
+        const bytes = this.#assets.read(job.input.assetId);
+        if (!bytes) {
+          throw normalizedError({
+            code: "VALIDATION_ERROR",
+            safeMessage: "引用的输入音频已不存在，请重新上传",
+            retryable: false,
+            submissionCertainty: "not_submitted",
+          });
+        }
+        return adapter.submitStt({
+          key,
+          audio: bytes,
+          fileName: job.input.fileName,
+          modelId: job.modelId ?? undefined,
+          languageCode: job.input.languageCode,
+          options: job.input.options,
+        });
+      }
       case "audio_isolation": {
         const bytes = this.#assets.read(job.input.assetId);
         if (!bytes) {
