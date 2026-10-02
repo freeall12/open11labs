@@ -13,7 +13,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/**/*.test.{ts,tsx,mjs}"],
     // This workspace lives on an exFAT volume, so macOS drops AppleDouble
     // `._name` sidecars next to every file. They match the include glob and
     // are not valid UTF-8, so keep them out.

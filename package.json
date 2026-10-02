@@ -12,7 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run tests/contract",
-    "test:unit": "vitest run tests/unit"
+    "test:unit": "vitest run tests/unit",
+    "server": "node server/cli.mjs",
+    "start": "npm run build && node server/cli.mjs",
+    "test:integration": "vitest run tests/integration"
   },
   "dependencies": {
     "react": "^19.2.0",
