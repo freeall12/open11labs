@@ -86,7 +86,9 @@ function LayoutToggle({
 function RecentsList() {
   return (
     <ul className="grid grid-cols-[32px_1fr_auto] gap-x-3 divide-y border-y sm:grid-cols-[32px_1fr_auto_auto] lg:grid-cols-[32px_1fr_200px_auto]">
-      {RECENT_ITEMS.map((item) => (
+      {RECENT_ITEMS.map((item) => {
+        const RowIcon = item.icon;
+        return (
         <li
           key={item.id}
           className="group relative col-span-3 grid grid-cols-subgrid items-center gap-3 bg-transparent! py-2.5 transition-colors duration-75 hover:bg-gray-alpha-50 sm:col-span-4"
@@ -97,17 +99,7 @@ function RecentsList() {
             className="focus-ring absolute inset-0 -inset-x-2.5 inset-y-0.5 rounded-xl text-left transition-colors duration-100 group-hover:bg-gray-alpha-50"
           />
           <div className="center relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-gray-75">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 text-secondary"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z" />
-            </svg>
+            <RowIcon size={20} className="text-secondary" />
           </div>
           <div className="relative col-span-2 grid min-w-0 flex-1 grid-cols-subgrid sm:col-span-3">
             <p className="line-clamp-1 text-sm font-medium text-foreground">
@@ -121,7 +113,8 @@ function RecentsList() {
             </span>
           </div>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

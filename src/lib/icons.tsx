@@ -1,31 +1,29 @@
 import type { SVGProps } from "react";
 
 /* ==========================================================================
-   Icon set.
+   Icons — GENERATED FILE, do not edit by hand.
+   Regenerate with:  node tools/build-icons.mjs
 
-   The live page draws these as inline SVG. Its DOM snapshot exposes the
-   element structure (e.g. the "more" glyph is one <path> + three <circle>)
-   but the query layer strips path geometry, so the exact coordinates are not
-   recoverable from the page. The shapes below are hand-built to match the
-   rendered appearance at 24x24 with currentColor, and every icon here is a
-   plain 2px stroke / filled path with no external dependency.
+   Every glyph below is the real artwork, extracted from the source site's
+   JavaScript bundles by tools/extract-icons.mjs. Each icon keeps the wrapper
+   attributes it ships with upstream: an 18x18 viewBox, fill="none", and
+   currentColor strokes, so sizing and colour work the same as the original.
 
-   Swap in a different `d` here if you have the original asset.
+   Source bundles:
+     tools/icons-bundle.js  (1816 icons, strokeWidth 1.5 wrapper)
+     tools/nav-bundle.js     (219 app/nav icons, per-path strokeWidth)
    ========================================================================== */
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
 function Svg({ size = 20, children, ...rest }: IconProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 18 18"
       fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
       {...rest}
     >
@@ -34,62 +32,10 @@ function Svg({ size = 20, children, ...rest }: IconProps) {
   );
 }
 
-/* ---------- Shell ---------- */
-
-/** Sidebar toggle: a panel with a divider. */
-export function IconPanel(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M9 4v16" />
-    </Svg>
-  );
-}
-
-export function IconBell(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-    </Svg>
-  );
-}
-
-export function IconSearch(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </Svg>
-  );
-}
-
-export function IconList(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M8 6h13M8 12h13M8 18h13" />
-      <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
-    </Svg>
-  );
-}
-
-export function IconGrid(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </Svg>
-  );
-}
-
-/* ---------- Prompt bar ---------- */
-
 export function IconPlus(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M12 5v14M5 12h14" />
+      <path stroke="currentColor" stroke-linecap="round" d="M9 3.938V9m0 0v5.063M9 9H3.938M9 9h5.063" />
     </Svg>
   );
 }
@@ -97,9 +43,7 @@ export function IconPlus(props: IconProps) {
 export function IconMic(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 10a7 7 0 0 0 14 0" />
-      <path d="M12 17v4" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M9 14.25a5.63 5.63 0 0 0 5.158-3.375M9 14.25a5.63 5.63 0 0 1-5.157-3.375M9 14.25v1.688m0-4.126a3.187 3.187 0 0 1-3.188-3.187V5.25a3.187 3.187 0 1 1 6.375 0v3.375A3.19 3.19 0 0 1 9 11.813" />
     </Svg>
   );
 }
@@ -107,106 +51,95 @@ export function IconMic(props: IconProps) {
 export function IconArrowUp(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M12 19V5M5 12l7-7 7 7" />
+      <path d="M9 14.5L9 3.5M4.5 8L9 3.5L13.5 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
     </Svg>
   );
 }
 
-/* ---------- Homepage tool glyphs ---------- */
+export function IconBell(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12.0001 12.938C12.0001 13.7337 11.684 14.4967 11.1214 15.0593C10.5588 15.622 9.79571 15.938 9.00006 15.938C8.20441 15.938 7.44135 15.622 6.87874 15.0593C6.31613 14.4967 6.00006 13.7337 6.00006 12.938M15.1881 12.183C15.1882 12.2822 15.1688 12.3804 15.1309 12.4721C15.093 12.5638 15.0374 12.647 14.9672 12.7172C14.8971 12.7873 14.8138 12.8429 14.7221 12.8808C14.6305 12.9187 14.5322 12.9382 14.4331 12.938H3.56706C3.4377 12.938 3.3105 12.9048 3.19771 12.8414C3.08492 12.778 2.99033 12.6867 2.92304 12.5762C2.85574 12.4658 2.818 12.3398 2.81345 12.2105C2.80891 12.0812 2.8377 11.953 2.89706 11.838L3.75006 10.182C3.89684 9.89711 3.98105 9.58412 3.99706 9.26402L4.12706 6.68202C4.19123 5.43372 4.73291 4.25787 5.64 3.39788C6.54708 2.53789 7.75011 2.0596 9.00006 2.06202C10.2498 2.05986 11.4526 2.53826 12.3595 3.39823C13.2664 4.25819 13.8079 5.43389 13.8721 6.68202L14.0021 9.26402C14.0191 9.58402 14.1031 9.89702 14.2501 10.182L15.1041 11.837C15.1591 11.9441 15.1879 12.0627 15.1881 12.183Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+    </Svg>
+  );
+}
 
-/** 语音 — an audio waveform, centre bars tallest. */
+export function IconPanel(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M2.813 5.063a2.25 2.25 0 0 1 2.25-2.25h7.875a2.25 2.25 0 0 1 2.25 2.25v7.875a2.25 2.25 0 0 1-2.25 2.25H5.062a2.25 2.25 0 0 1-2.25-2.25zM6.563 3v12" />
+    </Svg>
+  );
+}
+
 export function IconWaveform(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M3 12h1.5M7 8v8M10.5 4.5v15M14 7v10M17.5 9.5v5M21 12h-1.5" />
+      <path stroke="currentColor" stroke-linecap="round" d="M5.813 2.813v12.375m-3-7.876v3.375M9 5.814v6.375m3.188-7.876v9.375m3-6.374v3.375" />
     </Svg>
   );
 }
 
-/** 音乐 — a single note with a flag. */
 export function IconMusic(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M9 18V5l10-2v13" />
-      <circle cx="6.5" cy="18" r="2.5" />
-      <circle cx="16.5" cy="16" r="2.5" />
+      <path d="M7.31299 14.0629C7.31299 15.0979 6.30499 15.9379 5.06299 15.9379C3.81999 15.9379 2.81299 15.0979 2.81299 14.0629C2.81299 13.0279 3.81999 12.1879 5.06299 12.1879C6.30499 12.1879 7.31299 13.0269 7.31299 14.0629ZM7.31299 14.0629V6.00995C7.31287 5.52089 7.47211 5.0451 7.76658 4.65463C8.06106 4.26417 8.47474 3.98028 8.94499 3.84595L12.321 2.88195C12.6558 2.78631 13.0082 2.76968 13.3506 2.83338C13.6929 2.89707 14.0158 3.03936 14.2938 3.24902C14.5718 3.45869 14.7974 3.73002 14.9527 4.04166C15.108 4.3533 15.1889 4.69674 15.189 5.04495V11.8129M15.189 11.8129C15.189 12.8479 14.182 13.6879 12.939 13.6879C11.697 13.6879 10.689 12.8479 10.689 11.8129C10.689 10.7779 11.697 9.93795 12.939 9.93795C14.182 9.93795 15.189 10.7769 15.189 11.8129Z" stroke="currentColor" stroke-linejoin="round" />
     </Svg>
   );
 }
 
-/** 语音克隆 — four voice markers in a 2x2 block. */
 export function IconVoiceClones(props: IconProps) {
   return (
     <Svg {...props}>
-      <circle cx="9" cy="9" r="4" />
-      <circle cx="15" cy="9" r="4" />
-      <circle cx="9" cy="15" r="4" />
-      <circle cx="15" cy="15" r="4" />
+      <path d="M5.0625 7.875C6.6158 7.875 7.875 6.6158 7.875 5.0625C7.875 3.5092 6.6158 2.25 5.0625 2.25C3.5092 2.25 2.25 3.5092 2.25 5.0625C2.25 6.6158 3.5092 7.875 5.0625 7.875Z" stroke="currentColor" stroke-width="1.5" /><path d="M5.0625 15.75C6.6158 15.75 7.875 14.4908 7.875 12.9375C7.875 11.3842 6.6158 10.125 5.0625 10.125C3.5092 10.125 2.25 11.3842 2.25 12.9375C2.25 14.4908 3.5092 15.75 5.0625 15.75Z" stroke="currentColor" stroke-width="1.5" /><path d="M12.9375 7.875C14.4908 7.875 15.75 6.6158 15.75 5.0625C15.75 3.5092 14.4908 2.25 12.9375 2.25C11.3842 2.25 10.125 3.5092 10.125 5.0625C10.125 6.6158 11.3842 7.875 12.9375 7.875Z" stroke="currentColor" stroke-width="1.5" /><path d="M12.9375 15.75C14.4908 15.75 15.75 14.4908 15.75 12.9375C15.75 11.3842 14.4908 10.125 12.9375 10.125C11.3842 10.125 10.125 11.3842 10.125 12.9375C10.125 14.4908 11.3842 15.75 12.9375 15.75Z" stroke="currentColor" stroke-width="1.5" />
     </Svg>
   );
 }
 
-/** 图像 — a frame with a sun and a ridge. */
 export function IconImage(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="3" y="4" width="18" height="16" rx="2.5" />
-      <circle cx="8.5" cy="9.5" r="1.5" />
-      <path d="m4 17 4.5-4.5a2 2 0 0 1 2.8 0L16 17" />
-      <path d="m14 15 1.8-1.8a2 2 0 0 1 2.8 0L20 14.6" />
+      <path d="M10.875 8.62499V9.37499V8.62499ZM12.375 7.12499H13.125H12.375ZM9.37501 7.12499H8.62501H9.37501ZM2.81201 5.06299H2.06201H2.81201ZM2.81201 12.938H3.56201H2.81201ZM12.938 15.188V15.938V15.188ZM15.188 5.06199H15.938H15.188ZM2.54568 11.3947L2.01535 11.925L3.07601 12.9856L3.60634 12.4553L3.07601 11.925L2.54568 11.3947ZM4.41001 10.591L4.94034 11.1213L4.94034 11.1213L4.41001 10.591ZM5.13997 10.1032L5.42698 10.7962V10.7962L5.13997 10.1032ZM7.59201 10.591L7.06168 11.1213L7.06168 11.1213L7.59201 10.591ZM11.3957 15.4553L11.926 15.9856L12.9867 14.925L12.4563 14.3947L11.926 14.925L11.3957 15.4553ZM10.875 8.62499V9.37499C11.4717 9.37499 12.044 9.13794 12.466 8.71598L11.9357 8.18565L11.4053 7.65532C11.2647 7.79597 11.0739 7.87499 10.875 7.87499V8.62499ZM11.9357 8.18565L12.466 8.71598C12.888 8.29402 13.125 7.72172 13.125 7.12499H12.375H11.625C11.625 7.3239 11.546 7.51467 11.4053 7.65532L11.9357 8.18565ZM12.375 7.12499H13.125C13.125 6.52825 12.888 5.95595 12.466 5.534L11.9357 6.06433L11.4053 6.59466C11.546 6.73531 11.625 6.92608 11.625 7.12499H12.375ZM11.9357 6.06433L12.466 5.534C12.044 5.11204 11.4717 4.87499 10.875 4.87499V5.62499V6.37499C11.0739 6.37499 11.2647 6.45401 11.4053 6.59466L11.9357 6.06433ZM10.875 5.62499V4.87499C10.2783 4.87499 9.70598 5.11204 9.28402 5.534L9.81435 6.06433L10.3447 6.59466C10.4853 6.45401 10.6761 6.37499 10.875 6.37499V5.62499ZM9.81435 6.06433L9.28402 5.534C8.86206 5.95595 8.62501 6.52825 8.62501 7.12499H9.37501H10.125C10.125 6.92608 10.204 6.73531 10.3447 6.59466L9.81435 6.06433ZM9.37501 7.12499H8.62501C8.62501 7.72172 8.86206 8.29402 9.28402 8.71598L9.81435 8.18565L10.3447 7.65532C10.204 7.51467 10.125 7.3239 10.125 7.12499H9.37501ZM9.81435 8.18565L9.28402 8.71598C9.70598 9.13794 10.2783 9.37499 10.875 9.37499V8.62499V7.87499C10.6761 7.87499 10.4853 7.79597 10.3447 7.65532L9.81435 8.18565ZM12.938 2.81299V2.06299H5.06201V2.81299V3.56299H12.938V2.81299ZM5.06201 2.81299V2.06299C4.26636 2.06299 3.5033 2.37906 2.94069 2.94167L3.47102 3.472L4.00135 4.00233C4.28266 3.72102 4.66419 3.56299 5.06201 3.56299V2.81299ZM3.47102 3.472L2.94069 2.94167C2.37808 3.50428 2.06201 4.26734 2.06201 5.06299H2.81201H3.56201C3.56201 4.66516 3.72005 4.28363 4.00135 4.00233L3.47102 3.472ZM2.81201 5.06299H2.06201V12.938H2.81201H3.56201V5.06299H2.81201ZM2.81201 12.938H2.06201C2.06201 13.7336 2.37808 14.4967 2.94069 15.0593L3.47102 14.529L4.00135 13.9986C3.72005 13.7173 3.56201 13.3358 3.56201 12.938H2.81201ZM3.47102 14.529L2.94069 15.0593C3.5033 15.6219 4.26636 15.938 5.06201 15.938V15.188V14.438C4.66419 14.438 4.28266 14.28 4.00135 13.9986L3.47102 14.529ZM5.06201 15.188V15.938H12.938V15.188V14.438H5.06201V15.188ZM12.938 15.188V15.938C13.7337 15.938 14.4967 15.6219 15.0593 15.0593L14.529 14.529L13.9987 13.9986C13.7174 14.28 13.3358 14.438 12.938 14.438V15.188ZM14.529 14.529L15.0593 15.0593C15.6219 14.4967 15.938 13.7336 15.938 12.938H15.188H14.438C14.438 13.3358 14.28 13.7173 13.9987 13.9986L14.529 14.529ZM15.188 12.938H15.938V5.06199H15.188H14.438V12.938H15.188ZM15.188 5.06199H15.938C15.938 4.26634 15.6219 3.50328 15.0593 2.94067L14.529 3.471L13.9987 4.00133C14.28 4.28263 14.438 4.66416 14.438 5.06199H15.188ZM14.529 3.471L15.0593 2.94067C14.4961 2.37746 13.7328 2.06299 12.938 2.06299V2.81299V3.56299C13.3367 3.56299 13.718 3.72063 13.9987 4.00133L14.529 3.471ZM3.07601 11.925L3.60634 12.4553L4.94034 11.1213L4.41001 10.591L3.87968 10.0607L2.54568 11.3947L3.07601 11.925ZM4.41001 10.591L4.94034 11.1213C5.07963 10.982 5.24499 10.8715 5.42698 10.7962L5.13997 10.1032L4.85295 9.41033C4.48897 9.5611 4.15826 9.78208 3.87968 10.0607L4.41001 10.591ZM5.13997 10.1032L5.42698 10.7962C5.60897 10.7208 5.80403 10.682 6.00101 10.682V9.93197V9.18197C5.60704 9.18197 5.21693 9.25957 4.85295 9.41033L5.13997 10.1032ZM6.00101 9.93197V10.682C6.198 10.682 6.39305 10.7208 6.57504 10.7962L6.86206 10.1032L7.14907 9.41033C6.78509 9.25957 6.39498 9.18197 6.00101 9.18197V9.93197ZM6.86206 10.1032L6.57504 10.7962C6.75703 10.8715 6.92239 10.982 7.06168 11.1213L7.59201 10.591L8.12234 10.0607C7.84377 9.78208 7.51305 9.5611 7.14907 9.41033L6.86206 10.1032ZM7.59201 10.591L7.06168 11.1213L11.3957 15.4553L11.926 14.925L12.4563 14.3947L8.12234 10.0607L7.59201 10.591Z" fill="currentColor" />
     </Svg>
   );
 }
 
-/** 视频 — a camera body with a viewfinder. */
 export function IconVideo(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="2.5" y="6" width="13" height="12" rx="2.5" />
-      <path d="M15.5 10.5 21 7v10l-5.5-3.5z" />
+      <path stroke="currentColor" stroke-linejoin="round" d="M2.063 5.813a2.25 2.25 0 0 1 2.25-2.25h4.875a2.25 2.25 0 0 1 2.25 2.25v6.375a2.25 2.25 0 0 1-2.25 2.25H4.312a2.25 2.25 0 0 1-2.25-2.25zM11.438 7.5l3.414-1.707a.75.75 0 0 1 1.085.67v5.073a.75.75 0 0 1-1.085.671L11.437 10.5z" />
     </Svg>
   );
 }
 
-/** 配音 — a caption bubble. */
 export function IconCaption(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M21 12a8 8 0 0 1-8 8H4l2.2-2.9A8 8 0 1 1 21 12Z" />
-      <path d="M10 10.5h4M10 13.5h6" />
+      <path fill="currentColor" fill-rule="evenodd" d="M7.725 7.95a1.313 1.313 0 1 0 0 2.1.562.562 0 1 1 .676.9 2.438 2.438 0 1 1 0-3.9.563.563 0 0 1-.676.9m4.875 0a1.313 1.313 0 1 0 0 2.1.562.562 0 1 1 .676.9 2.438 2.438 0 1 1 0-3.9.562.562 0 0 1-.676.9" clip-rule="evenodd" /><path stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" d="M12.938 2.813H5.062a2.25 2.25 0 0 0-2.25 2.25v7.875a2.25 2.25 0 0 0 2.25 2.25h7.876a2.25 2.25 0 0 0 2.25-2.25V5.062a2.25 2.25 0 0 0-2.25-2.25Z" />
     </Svg>
   );
 }
 
-/** 虚拟形象 — a sparkle with swap arrows. */
 export function IconAvatarSparkle(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M12 3.5 13.6 8 18 9.5 13.6 11 12 15.5 10.4 11 6 9.5 10.4 8z" />
-      <path d="M18.5 15.5h-3l-1 2.5" />
-      <path d="M5.5 15.5h3l1 2.5" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M8.438 2.813H5.062a2.25 2.25 0 0 0-2.25 2.25v7.875a2.25 2.25 0 0 0 2.25 2.25h.38m0 0a3.563 3.563 0 0 1 7.116 0m-7.116 0h7.116m0 0h.38a2.25 2.25 0 0 0 2.25-2.25V9.562m-.938-8.25.813 1.626 1.624.812-1.625.813-.812 1.625-.812-1.625-1.626-.813 1.626-.812zm-3.187 6.563a2.062 2.062 0 1 1-4.125 0 2.062 2.062 0 0 1 4.125 0" />
     </Svg>
   );
 }
 
-/** 更多 — a dotted circle. Structure matches the live markup (1 path + 3 circles). */
 export function IconMore(props: IconProps) {
   return (
     <Svg {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="8.5" cy="12" r="0.75" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="0.75" fill="currentColor" stroke="none" />
-      <circle cx="15.5" cy="12" r="0.75" fill="currentColor" stroke="none" />
+      <path d="M15.938 9C15.938 10.8399 15.2071 12.6045 13.906 13.9056C12.605 15.2066 10.8404 15.9375 9.00049 15.9375C7.16055 15.9375 5.39597 15.2066 4.09494 13.9056C2.7939 12.6045 2.06299 10.8399 2.06299 9C2.06299 7.16006 2.7939 5.39548 4.09494 4.09445C5.39597 2.79341 7.16055 2.0625 9.00049 2.0625C10.8404 2.0625 12.605 2.79341 13.906 4.09445C15.2071 5.39548 15.938 7.16006 15.938 9Z" stroke="currentColor" /><circle cx="6" cy="9" r="1" fill="currentColor" /><circle cx="9" cy="9" r="1" fill="currentColor" /><circle cx="12" cy="9" r="1" fill="currentColor" />
     </Svg>
   );
 }
-
-/* ---------- Sidebar navigation ---------- */
 
 export function IconHome(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z" />
+      <path stroke="currentColor" stroke-linejoin="round" d="M2.813 7.706c0-.627 0-.94.078-1.23.07-.257.185-.5.34-.716.174-.245.417-.443.902-.84L6.72 2.803c.812-.665 1.219-.997 1.67-1.124a2.25 2.25 0 0 1 1.22 0c.451.127.857.46 1.67 1.124l2.587 2.117c.485.397.728.595.902.84.155.217.27.459.34.716.079.29.079.603.079 1.23v3.882c0 1.26 0 1.89-.246 2.371a2.25 2.25 0 0 1-.983.983c-.481.246-1.111.246-2.371.246H6.413c-1.26 0-1.89 0-2.372-.246a2.25 2.25 0 0 1-.983-.983c-.245-.481-.245-1.111-.245-2.371z" />
     </Svg>
   );
 }
@@ -214,9 +147,7 @@ export function IconHome(props: IconProps) {
 export function IconLibrary(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="3" y="4" width="5" height="16" rx="1.5" />
-      <rect x="10" y="4" width="5" height="16" rx="1.5" />
-      <path d="m17.5 5.5 3 13" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M2.813 2.813v12.375m3.75-12.375v12.375m3-12.375 5.624 12.375" />
     </Svg>
   );
 }
@@ -224,8 +155,7 @@ export function IconLibrary(props: IconProps) {
 export function IconStudio(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M4 6h16M4 12h16M4 18h10" />
-      <circle cx="18" cy="18" r="2" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M14.438 2.813H3.563a1.5 1.5 0 0 0-1.5 1.5v5.625a1.5 1.5 0 0 0 1.5 1.5h10.875a1.5 1.5 0 0 0 1.5-1.5V4.312a1.5 1.5 0 0 0-1.5-1.5m-7.5 9.001v3.374h4.125v-3.374" />
     </Svg>
   );
 }
@@ -233,9 +163,7 @@ export function IconStudio(props: IconProps) {
 export function IconFlows(props: IconProps) {
   return (
     <Svg {...props}>
-      <rect x="3" y="3" width="7" height="7" rx="2" />
-      <rect x="14" y="14" width="7" height="7" rx="2" />
-      <path d="M10 6.5h4a2 2 0 0 1 2 2V14" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M9.54102 14.255L10.5 14.25H13.5C14.7427 14.25 15.75 13.2427 15.75 12V7.5C15.75 6.25736 14.7427 5.25 13.5 5.25H9.8028C9.30128 5.25 8.8329 4.99935 8.55472 4.58205L7.94527 3.66795C7.6671 3.25065 7.19875 3 6.69722 3H4.5C3.25736 3 2.25 4.00736 2.25 5.25V9.30194V10M9.54102 14.255C9.54102 15.0834 8.86944 15.755 8.04102 15.755C7.21259 15.755 6.54102 15.0834 6.54102 14.255C6.54102 13.4265 7.21259 12.755 8.04102 12.755C8.86944 12.755 9.54102 13.4265 9.54102 14.255ZM2.25 10C1.42157 10 0.75 10.6716 0.75 11.5C0.75 12.3284 1.42157 13 2.25 13C3.07843 13 3.75 12.3284 3.75 11.5C3.75 10.6716 3.07843 10 2.25 10Z" />
     </Svg>
   );
 }
@@ -243,8 +171,7 @@ export function IconFlows(props: IconProps) {
 export function IconChat(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M20 12a7 7 0 0 1-7 7H8l-4 2.5V12a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7Z" />
-      <path d="M9 11h.01M12 11h.01M15 11h.01" />
+      <path stroke="currentColor" stroke-linejoin="round" d="M9 15.563c3.832 0 6.938-2.939 6.938-6.563S12.83 2.438 9 2.438 2.063 5.376 2.063 9c0 1.13.302 2.194.834 3.123.328.572.527 1.233.342 1.865-.117.4-.255.795-.406 1.189.646-.04 1.266-.122 1.87-.246a3.1 3.1 0 0 1 1.711.16c.8.304 1.672.472 2.586.472Z" />
     </Svg>
   );
 }
@@ -252,7 +179,39 @@ export function IconChat(props: IconProps) {
 export function IconAssets(props: IconProps) {
   return (
     <Svg {...props}>
-      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2.5h7.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" />
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M8.063 2.063h2.442c.597 0 1.17.237 1.592.659l2.432 2.431c.421.422.659.995.659 1.591v4.694a2.25 2.25 0 0 1-2.25 2.25H8.061a2.25 2.25 0 0 1-2.25-2.25V4.312a2.25 2.25 0 0 1 2.25-2.25m4.877 11.626a2.25 2.25 0 0 1-2.25 2.25H5.812a2.25 2.25 0 0 1-2.25-2.25V6.562a2.25 2.25 0 0 1 2.25-2.25m5.626-2.249v2.25a1.5 1.5 0 0 0 1.5 1.5h2.25" />
+    </Svg>
+  );
+}
+
+export function IconSearch(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="m15 15-2.905-2.905m0 0a5.437 5.437 0 1 0-7.69-7.69 5.437 5.437 0 0 0 7.69 7.69" />
+    </Svg>
+  );
+}
+
+export function IconList(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M8.813 12.563h6.374M8.813 5.438h6.374m-9.374 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m0 7.125a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0" />
+    </Svg>
+  );
+}
+
+export function IconGrid(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M6.938 3v12m4.125-12v12M3 6.938h12M3 11.063h12m-2.062-8.25H5.062a2.25 2.25 0 0 0-2.25 2.25v7.875a2.25 2.25 0 0 0 2.25 2.25h7.876a2.25 2.25 0 0 0 2.25-2.25V5.062a2.25 2.25 0 0 0-2.25-2.25" />
+    </Svg>
+  );
+}
+
+export function IconSoundFx(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M3.974 5.813H2.812a1.5 1.5 0 0 0-1.5 1.5v3.375a1.5 1.5 0 0 0 1.5 1.5h1.162c.34 0 .67.115.937.328l3.058 2.447a.75.75 0 0 0 1.218-.586V3.623a.75.75 0 0 0-1.218-.586L4.911 5.484a1.5 1.5 0 0 1-.937.329" /><path fill="currentColor" d="M12.824 10.343a.317.317 0 0 1 .602 0l.285.869c.032.095.107.17.202.202l.87.285c.29.096.29.506 0 .602l-.87.285a.32.32 0 0 0-.202.202l-.285.87a.317.317 0 0 1-.602 0l-.285-.87a.32.32 0 0 0-.202-.202l-.87-.285a.317.317 0 0 1 0-.602l.87-.285a.32.32 0 0 0 .202-.202zm1.38-5.913a.443.443 0 0 1 .842 0l.4 1.216a.44.44 0 0 0 .283.283l1.216.4a.443.443 0 0 1 0 .842l-1.216.4a.44.44 0 0 0-.283.283l-.4 1.216a.443.443 0 0 1-.842 0l-.4-1.216a.44.44 0 0 0-.283-.283l-1.216-.4a.443.443 0 0 1 0-.842l1.217-.4a.44.44 0 0 0 .282-.283z" />
     </Svg>
   );
 }

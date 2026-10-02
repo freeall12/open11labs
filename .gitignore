@@ -31,3 +31,13 @@ dist/
 # DOM snapshots of elevenlabs.io. Keep it local; do not publish it.
 research/
 
+# Research-capture tooling that reads the excluded corpus above.
+scripts/
+
+# Icon-library bundles (~1.3MB of the source site's own minified JS).
+# Re-download with `node tools/fetch-bundles.mjs`; never commit them.
+tools/icons-bundle.js
+tools/nav-bundle.js
+tools/.pull.json
+tools/.icons.json
+

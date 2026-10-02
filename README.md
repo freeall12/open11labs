@@ -51,36 +51,54 @@ npm run typecheck
 
 ---
 
-## 已知边界（未还原部分）
+## 美术资源：全部来自源站，非手绘
 
-以下几项**没有**做到 1:1，如实标注：
+字体和图标都是**从源站抓下来的真实资源**，不是自己画的。
 
-1. **Waldenburg 字体**
-   标题字体是 ElevenLabs 的专有字体（`Waldenburg_*.woff2`），未打包。本仓库内置了从原站 `@font-face` 提取的**度量兼容回退**（`ascent-override: 89.65%`、`descent-override: 22.9%`、`size-adjust: 106.97%`），行高与视觉尺寸对齐，但字形不同。
-   如需真字体：把授权文件放入 `public/fonts/`，取消 `src/fonts.css` 中的注释。
+### 字体
 
-2. **图标 path 数据**
-   浏览器的 DOM 查询层会剥离 SVG 的 path 几何数据（只返回元素标签，如"更多"= 1 个 `path` + 3 个 `circle`）。图标按可见形状手写为 24×24 / currentColor 等价图形，**结构对齐、几何为近似**。有原始资源时替换 `src/lib/icons.tsx` 里的 `d` 即可。
+`public/fonts/` 下 4 个 woff2，共 161KB，从生产样式表
+`19le4vtp6prk5.css` 的 `@font-face` 声明里解析出真实 CDN 路径后下载：
 
-3. **营销横幅**
-   按你的批注不复刻。`HomePage.tsx` 中对应位置留了注释锚点。
+| 文件 | 字重 |
+|---|---|
+| `Waldenburg_Regular-s.p.43r3ozarrunyz.woff2` | 400 |
+| `Waldenburg_Medium-s.p.0dk8kt88f3bhr.woff2` | 500 |
+| `Waldenburg_Bold-s.p.3x8ofswqwnzku.woff2` | 700 |
+| `Waldenburg_Bold_SemiCondensed-s.p.1xwtlv9quw8fr.woff2` | 700 (HF) |
 
-4. **最近列表的网格视图**
-   列表视图已还原；切到网格视图时显示占位文案，尚未还原。
+### 图标
 
-5. **快速入门模板缩略图**
-   卡片栅格结构已还原（3 列、311×175、12px 间距、底部标题遮罩），缩略图为占位渐变。
+`src/lib/icons.tsx` 是**生成文件**，23 个图标全部由工具从源站 JS bundle 里
+提取真实 path/circle 几何后产出：
 
-6. **垂直节奏**
-   原站用 `9dvh` 做首屏留白，该值随视口高度变化。两页对比时视口高度不同（真实 800px / 本地 1028px），故纵向绝对坐标不可直接比对；横向几何与盒模型尺寸已逐项对齐。
+```bash
+node tools/fetch-bundles.mjs   # 下载两个图标库 bundle
+node tools/build-icons.mjs     # 生成 src/lib/icons.tsx
+```
 
-7. **暗色主题**
-   令牌值已完整实现（`--lighten-*` 全套来自原站），但未做逐像素视觉校验。
+站点有两套图标库，两套都已在工具里支持：
 
-8. **数据**
-   `src/data/recents.ts` 为示例数据。**未**写入你账号里的真实项目内容。接 BYOK 时替换该数据源即可。
+| Bundle | 图标数 | 包装器 | 判定依据 |
+|---|---|---|---|
+| `1ez0d0on-xxdx.js` | 1816 | `width=18 viewBox="0 0 18 18"` + `strokeWidth 1.5` | `displayName="X"` |
+| `07el4lpsvg9qo.js` | 219 | `size`/`color` props，path 自带 `strokeWidth` | `"X",0,function({size:` |
+
+**图标归属经过真实 DOM 交叉验证**，不是按名字猜的：
+
+- 语音克隆 → `NavVoicesIcon`（真实 DOM 为 4 个 `<path>`，库内仅此图标元素数为 4 且视觉吻合）
+- 图像 → `ImageIcon`（真实 DOM 为 1 个 `<path>`，库内同为 1）
+- 更多 → `CircleEllipsisHorizontalIcon`（真实 DOM 为 1 path + 3 circle，提取结果完全一致）
+
+`tools/icon-sheet.mjs` 可把任意候选图标渲染成对照表，用于肉眼比对：
+
+```bash
+node tools/icon-sheet.mjs tools/icons-bundle.js /tmp/sheet.html PlusIcon MicIcon ...
+```
 
 ---
+
+## 已知边界（未还原部分）
 
 ## 目录结构
 
@@ -98,7 +116,7 @@ src/
     RecentsPanel.tsx 最近 / 快速入门双标签 + 搜索 + 布局切换
     AnimatedAvatar.tsx  canvas 多色渐变动效
   data/              导航、工具、最近项数据
-  lib/icons.tsx      图标集
+  lib/icons.tsx      图标集（生成文件，勿手改）
 ```
 
 ---
@@ -107,7 +125,6 @@ src/
 
 按你的节奏继续。可选方向：
 
-- 还原 Waldenburg 字体与图标原始资源（需要你提供授权文件）
 - 复刻「网格视图」与模板缩略图
 - 接 BYOK 层：把 `src/data/` 换成真实数据源
 - 复刻下一个页面（工作室 / 音色库 / Flows）

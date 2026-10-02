@@ -39,13 +39,9 @@
   /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  /* Waldenburg is ElevenLabs' proprietary display face. The metrics below are
-     the site's own `Waldenburg Fallback` @font-face overrides, so text keeps
-     the same optical size even when the licensed file is absent. Drop
-     Waldenburg_*.woff2 into /public/fonts and uncomment the @font-face block
-     in fonts.css to switch to the real face. */
-  --font-waldenburg: "Waldenburg", "Waldenburg Fallback", "Inter", ui-sans-serif,
-    system-ui, sans-serif;
+  /* Waldenburg is ElevenLabs' proprietary display face. Real files are
+     downloaded to /public/fonts — see fonts.css. */
+  --font-waldenburg: "Waldenburg", ui-sans-serif, system-ui, sans-serif;
 
   /* Radii */
   --radius-sm: 0.125rem;
