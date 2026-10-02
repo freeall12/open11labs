@@ -31,8 +31,19 @@ dist/
 # DOM snapshots of elevenlabs.io. Keep it local; do not publish it.
 research/
 
-# Research-capture tooling that reads the excluded corpus above.
+# BYOK runtime data and generated test artifacts (never publish secrets)
+data/
+coverage/
+test-results/
+playwright-report/
+*.log
+
+# Keep other research-capture tooling ignored; these two safe helpers are public.
 scripts/
+!scripts/
+scripts/*
+!scripts/check-docs.mjs
+!scripts/index-research.mjs
 
 # Icon-library bundles (~1.3MB of the source site's own minified JS).
 # Re-download with `node tools/fetch-bundles.mjs`; never commit them.

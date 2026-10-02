@@ -1,4 +1,8 @@
-# ElevenLabs BYOK Clone — 首页前端复刻
+# ElevenLabs BYOK Local — 创作工具复刻
+
+> 当前开发范围与交接：见 [AGENTS.md](AGENTS.md)、[文档入口](docs/README.md)、[范围裁剪](specs/SCOPE.md)。**原站全部营销与账号相关内容已明确排除**；保留创作工具及本地BYOK配置。给实施Agent的启动提示词见 [GOAL_PROMPT.md](GOAL_PROMPT.md)。
+>
+> 以下为既有首页原型的历史实现说明，不代表全站/BYOK后端已完成；后续以spec与实际验收记录为准。
 
 对 `elevenlabs.io/app/home` 的 1:1 前端复刻，纯源码实现。
 
