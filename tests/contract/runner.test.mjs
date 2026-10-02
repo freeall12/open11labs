@@ -42,13 +42,21 @@ function makeVault() {
   return v;
 }
 
+/** The stub forwards every adapter entry point the runner may call. */
 function makeAdapter(impl) {
+  const forward = (name) => async (input) => {
+    seen.push({ via: name, input });
+    return impl(input);
+  };
   return {
     elevenlabs: {
-      async submit(input) {
-        seen.push(input);
-        return impl(input);
-      },
+      submit: forward("submit"),
+      submitSts: forward("submitSts"),
+      submitSfx: forward("submitSfx"),
+      submitIsolation: forward("submitIsolation"),
+      submitAsync: forward("submitAsync"),
+      pollStatus: forward("pollStatus"),
+      fetchArtifact: forward("fetchArtifact"),
     },
   };
 }
@@ -114,7 +122,7 @@ describe("successful run", () => {
     })).run(job.id);
 
     // The key reached the adapter...
-    expect(seen[0].key).toBe(SECRET);
+    expect(seen[0].input.key).toBe(SECRET);
     // ...but nowhere in the row that lives on disk.
     const row = db.prepare("SELECT * FROM jobs WHERE id = ?").get(job.id);
     expect(JSON.stringify(row)).not.toContain(SECRET);
@@ -340,5 +348,53 @@ describe("sound effects", () => {
 
     expect(out.ok).toBe(false);
     expect(out.job.status).toBe("failed");
+  });
+});
+
+/* ------------------------------------------------------ voice isolator -- */
+
+describe("voice isolation", () => {
+  function isolationJob(assetId) {
+    return jobs.createOrGet({
+      intentId: `iso-${assetId}`,
+      type: "audio_isolation",
+      providerId: "elevenlabs",
+      credentialRef: vault.list()[0].id,
+      input: { assetId, fileName: "clip.mp3", mimeType: "audio/mpeg" },
+    }).job;
+  }
+
+  it("reads its input from the asset store, not from the snapshot", async () => {
+    const { asset } = await assets.put({
+      bytes: MP3,
+      displayName: "clip.mp3",
+      mediaType: "audio/mpeg",
+      origin: "uploaded",
+    });
+    const job = isolationJob(asset.id);
+
+    const out = await withAdapter(async (input) => {
+      // The adapter received real bytes, not an id it has to resolve itself.
+      expect(input.audio.byteLength).toBeGreaterThan(0);
+      expect(seen[0].via).toBe("submitIsolation");
+      return {
+        artifact: { bytes: MP3, contentType: "audio/mpeg", suggestedName: "out.mp3" },
+        providerRequestId: "req_iso",
+      };
+    }).run(job.id);
+
+    expect(out.ok).toBe(true);
+    expect(out.job.status).toBe("succeeded");
+  });
+
+  it("fails clearly when the referenced input asset is gone", async () => {
+    const job = isolationJob("asset_does_not_exist");
+    const out = await withAdapter(async () => {
+      throw new Error("must not be called");
+    }).run(job.id);
+
+    expect(seen).toHaveLength(0);
+    expect(out.job.status).toBe("failed");
+    expect(out.job.error.code).toBe("VALIDATION_ERROR");
   });
 });

@@ -3,6 +3,7 @@ import { routeById } from "@/app/route-manifest";
 import type { RouteEntry } from "@/app/route-manifest";
 import { TtsPage as TtsPageBody } from "@/features/voice/TtsPage";
 import { StsPage as StsPageBody } from "@/features/voice/StsPage";
+import { IsolatorPage as IsolatorPageBody } from "@/features/voice/IsolatorPage";
 
 /* ==========================================================================
    VOICE module — voice library, cloning/design, TTS, STS, STT, isolation,
@@ -37,7 +38,11 @@ export function StsPage() {
   if (!route) throw new Error("unknown route: sts");
   return <PageFrame route={route}><StsPageBody /></PageFrame>;
 }
-export const IsolatorPage = page("isolator");
+export function IsolatorPage() {
+  const route = routeById("isolator");
+  if (!route) throw new Error("unknown route: isolator");
+  return <PageFrame route={route}><IsolatorPageBody /></PageFrame>;
+}
 export const SttPage = page("stt");
 export const SpeakersPage = page("speakers");
 export const DubbingPage = page("dubbing");

@@ -561,6 +561,45 @@ export class ElevenLabsAdapter {
     };
   }
 
+  /**
+   * Voice isolation — API-05, `POST /v1/audio-isolation`, multipart.
+   *
+   * The documented 500MB / 1h figures are per-tool documentation observations,
+   * not a verified API limit, and they are not a global upload cap. So nothing
+   * is enforced here beyond refusing an empty file; the real limit is whatever
+   * the provider reports.
+   */
+  async submitIsolation({ key, audio, fileName, inputMime }) {
+    if (!audio || !(audio instanceof Uint8Array) || audio.byteLength === 0) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请先上传或录制需要分离的音频",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+
+    const form = new FormData();
+    form.set("audio", new Blob([audio], { type: inputMime ?? "audio/mpeg" }), fileName ?? "input.mp3");
+
+    const out = await this.#request({
+      method: "POST",
+      path: "/v1/audio-isolation",
+      key,
+      body: form,
+      expect: "binary",
+    });
+
+    return {
+      artifact: {
+        bytes: out.bytes,
+        contentType: out.contentType,
+        suggestedName: `isolated-${Date.now()}.mp3`,
+      },
+      providerRequestId: out.requestId,
+    };
+  }
+
   /** Synchronous TTS has nothing to poll. */
   async getStatus() {
     throw normalizedError({
