@@ -14,8 +14,8 @@ import { Vault, maskSecret, assertAllowedBaseURL } from "../../server/lib/vault.
    failure of the test suite, not a tolerated gap.
    ========================================================================== */
 
-const PORT = 5199;
-const ORIGIN = `http://127.0.0.1:${PORT}`;
+let PORT = 0;
+let ORIGIN = "";
 
 /** Captured log lines, so we can prove no secret was written. */
 let logLines = [];
@@ -34,14 +34,19 @@ let base;
 beforeAll(async () => {
   const root = makeRoot();
   const vault = new Vault();
-  ({ server } = createLocalServer({
+  const handle = createLocalServer({
     root,
     vault,
-    port: PORT,
+    port: 0,
     log: (entry) => logLines.push(entry),
-  }));
+  });
 
-  await new Promise((resolve) => server.listen(PORT, "127.0.0.1", resolve));
+  // Ephemeral port: fixed ports collide when files run in parallel.
+  await new Promise((resolve) => handle.server.listen(0, "127.0.0.1", resolve));
+  handle.adoptActualPort();
+  server = handle.server;
+  PORT = server.address().port;
+  ORIGIN = `http://127.0.0.1:${PORT}`;
   base = `http://127.0.0.1:${PORT}`;
 });
 
