@@ -66,11 +66,18 @@ interface RequestOptions {
   body?: unknown;
   /** Set for endpoints that need the CSRF token echoed. */
   mutate?: boolean;
+  /** Send a multipart body instead of JSON. */
+  multipart?: boolean;
 }
 
 export async function request<T = unknown>(
   path: string,
-  { method = "GET", body, mutate = method !== "GET" }: RequestOptions = {},
+  {
+    method = "GET",
+    body,
+    mutate = method !== "GET",
+    multipart = false,
+  }: RequestOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
 
@@ -78,7 +85,8 @@ export async function request<T = unknown>(
   // requires it for reads too, and the cookie only arrives from the bootstrap.
   const token = await ensureCsrf();
 
-  if (body !== undefined) headers["content-type"] = "application/json";
+  // FormData must set its own boundary, so no content-type here.
+  if (body !== undefined && !multipart) headers["content-type"] = "application/json";
   if (mutate) headers["x-csrf-token"] = token;
 
   const res = await fetch(`${BASE}${path}`, {
@@ -266,7 +274,22 @@ export const cost = {
 
 export const assets = {
   list: () =>
-    request<{ assets: unknown[]; usage: { totalBytes: number; count: number } }>("/assets"),
+    request<{ assets: AssetRecord[]; usage: { totalBytes: number; count: number } }>(
+      "/assets",
+    ).then((r) => ({ ...r, assets: r.assets })),
+
+  /**
+   * Upload a file. Uses FormData so the browser sets the multipart boundary;
+   * the session cookie rides along and CSRF is echoed because this is a write.
+   */
+  upload: (file: File) => {
+    const form = new FormData();
+    form.set("file", file, file.name);
+    return request<{ asset: AssetRecord; created: boolean }>("/assets", {
+      method: "POST",
+      body: form,
+    });
+  },
 };
 
 export const backup = {

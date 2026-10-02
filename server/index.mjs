@@ -75,6 +75,47 @@ function safeLog(entry) {
 
 /* ------------------------------------------------------------- helpers -- */
 
+/**
+ * Pull the first file part out of a multipart body. Deliberately minimal: it
+ * reads the part headers and slices the payload rather than trusting a full
+ * parser with the uploaded bytes.
+ */
+function extractSingleFile(buffer, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!m) return {};
+  const boundary = `--${(m[1] ?? m[2]).trim()}`;
+  // The first boundary sits at byte 0 with no leading CRLF; every later one
+  // is preceded by one. Looking for only the CRLF form misses the first part.
+  const firstSep = Buffer.from(`${boundary}\r\n`);
+  const laterSep = Buffer.from(`\r\n${boundary}\r\n`);
+  let start = buffer.indexOf(firstSep);
+  let sep = firstSep;
+  if (start < 0) {
+    start = buffer.indexOf(laterSep);
+    sep = laterSep;
+  }
+  if (start < 0) return {};
+
+  const headersEnd = buffer.indexOf("\r\n\r\n", start + sep.length);
+  if (headersEnd < 0) return {};
+
+  const rawHeaders = buffer
+    .slice(start + sep.length, headersEnd)
+    .toString("utf8");
+  const nameMatch = /filename="([^"]*)"/i.exec(rawHeaders);
+  const typeMatch = /content-type:\s*([^\r\n]+)/i.exec(rawHeaders);
+
+  const bodyStart = headersEnd + 4;
+  const nextBoundary = buffer.indexOf(Buffer.from(`\r\n${boundary}`), bodyStart);
+  if (nextBoundary < 0) return {};
+
+  return {
+    filename: nameMatch?.[1],
+    contentType: typeMatch?.[1]?.trim(),
+    bytes: new Uint8Array(buffer.slice(bodyStart, nextBoundary)),
+  };
+}
+
 function json(res, status, body, headers = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -407,6 +448,57 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
         "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(rec.displayName)}`,
       });
       return res.end(Buffer.from(bytes));
+    }
+
+    /* -- asset import ------------------------------------------------- */
+    if (urlPath === "/api/v1/assets" && req.method === "POST") {
+      const ct = req.headers["content-type"] ?? "";
+      if (!ct.startsWith("multipart/form-data")) {
+        return json(res, 415, {
+          error: { code: "VALIDATION_ERROR", safeMessage: "需要 multipart/form-data 上传" },
+        });
+      }
+      // Size is checked while streaming so a large body is never buffered whole.
+      const chunks = [];
+      let total = 0;
+      let tooLarge = false;
+      for await (const chunk of req) {
+        total += chunk.length;
+        if (total > 512 * 1024 * 1024) {
+          tooLarge = true;
+          break;
+        }
+        chunks.push(chunk);
+      }
+      if (tooLarge) {
+        return json(res, 413, {
+          error: { code: "VALIDATION_ERROR", safeMessage: "上传超过本地上限" },
+        });
+      }
+
+      // Parse just enough of the multipart body to recover the file part.
+      const { filename, contentType, bytes } =
+        extractSingleFile(Buffer.concat(chunks), ct);
+      if (!bytes) {
+        return json(res, 400, {
+          error: { code: "VALIDATION_ERROR", safeMessage: "未在上传中找到文件字段" },
+        });
+      }
+
+      try {
+        const { asset, created } = await assets.put({
+          bytes,
+          displayName: filename ?? "upload",
+          mediaType: contentType,
+          origin: "uploaded",
+        });
+        log({ event: "asset.imported", id: asset.id, created });
+        return json(res, created ? 201 : 200, { asset, created });
+      } catch (err) {
+        return json(res, 400, {
+          error: { code: err.code ?? "VALIDATION_ERROR", safeMessage: err.message },
+        });
+      }
     }
 
     /* -- projects ----------------------------------------------------- */

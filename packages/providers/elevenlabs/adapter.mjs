@@ -24,6 +24,12 @@ import {
 
 export const PROVIDER_ID = "elevenlabs";
 
+/**
+ * Speech-to-speech models only. The TTS ids are deliberately excluded: mixing
+ * them produces a confusing upstream error instead of a clear local one.
+ */
+const STS_MODELS = ["eleven_multilingual_sts_v2", "eleven_voice_changer_v1"];
+
 const MODEL_TASKS = {
   tts: "text_to_speech",
   transcription: "speech_to_text",
@@ -67,10 +73,14 @@ export class ElevenLabsAdapter {
         headers: {
           "xi-api-key": key,
           accept: expect === "binary" ? "*/*" : "application/json",
-          ...(body && !headers["content-type"] ? { "content-type": body.type } : {}),
+          // A FormData body must keep its own boundary, so no content-type is
+          // set for it; a string body is already JSON.
+          ...(body && typeof body === "string" && !headers["content-type"]
+            ? { "content-type": "application/json" }
+            : {}),
           ...headers,
         },
-        body: body && body.type === "string" ? undefined : body,
+        body: body ?? undefined,
       });
     } catch (err) {
       const aborted = err?.name === "AbortError";
@@ -418,6 +428,81 @@ export class ElevenLabsAdapter {
         ? data.url
         : null,
       errorMessage: state === "failed" ? String(data?.error ?? "供应商任务失败") : null,
+    };
+  }
+
+  /**
+   * Speech to speech — API-04, `POST /v1/speech-to-speech/:voice_id`, multipart.
+   *
+   * The model is constrained to the STS family on purpose. docs say the
+   * multilingual STS id is not interchangeable with the TTS one, so a TTS
+   * model id is rejected here rather than being forwarded and failing
+   * opaquely upstream.
+   */
+  async submitSts({ key, voiceId, audio, fileName, modelId, params }) {
+    if (!STS_MODELS.includes(modelId)) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: `变声器不支持模型 ${modelId}；请使用 ${STS_MODELS.join(" 或 ")}`,
+        retryable: false,
+        submissionCertainty: "not_submitted",
+        fieldErrors: { modelId: `必须是 ${STS_MODELS.join(", ")}` },
+      });
+    }
+    if (!voiceId) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "必须选择目标音色",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+    if (!audio || !(audio instanceof Uint8Array) || audio.byteLength === 0) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请先上传或录制音频",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+
+    const form = new FormData();
+    form.set("model_id", modelId);
+    form.set("output_format", params?.outputFormat ?? "mp3_44100_128");
+    if (typeof params?.stability === "number") {
+      form.set("stability", String(params.stability));
+    }
+    if (typeof params?.similarity_boost === "number") {
+      form.set("similarity_boost", String(params.similarity_boost));
+    }
+    if (typeof params?.style === "number") form.set("style", String(params.style));
+    if (params?.remove_background_noise === undefined) {
+      form.set("remove_background_noise", "false");
+    } else {
+      form.set("remove_background_noise", String(params.remove_background_noise));
+    }
+    // The filename is a label only; it is never used as a path.
+    form.set(
+      "audio",
+      new Blob([audio], { type: params?.inputMime ?? "audio/mpeg" }),
+      fileName ?? "input.mp3",
+    );
+
+    const out = await this.#request({
+      method: "POST",
+      path: `/v1/speech-to-speech/${encodeURIComponent(voiceId)}`,
+      key,
+      body: form,
+      expect: "binary",
+    });
+
+    return {
+      artifact: {
+        bytes: out.bytes,
+        contentType: out.contentType,
+        suggestedName: `sts-${voiceId}-${Date.now()}.mp3`,
+      },
+      providerRequestId: out.requestId,
     };
   }
 

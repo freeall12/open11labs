@@ -311,6 +311,27 @@ export class JobRunner {
 
   async #dispatch(adapter, job, key) {
     switch (job.type) {
+      case "speech_to_speech": {
+        // The input arrives as a stored asset, not inline bytes, so the job
+        // snapshot never carries audio.
+        const bytes = this.#assets.read(job.input.assetId);
+        if (!bytes) {
+          throw normalizedError({
+            code: "VALIDATION_ERROR",
+            safeMessage: "引用的输入音频已不存在，请重新上传",
+            retryable: false,
+            submissionCertainty: "not_submitted",
+          });
+        }
+        return adapter.submitSts({
+          key,
+          voiceId: job.input.voiceId,
+          audio: bytes,
+          fileName: job.input.fileName,
+          modelId: job.modelId ?? undefined,
+          params: job.input.params,
+        });
+      }
       case "text_to_speech":
         return adapter.submit({
           key,
