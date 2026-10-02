@@ -656,6 +656,133 @@ export class ElevenLabsAdapter {
     };
   }
 
+  /**
+   * Dubbing, step 1 of 2 — `POST /v1/dubbing`.
+   *
+   * Endpoint confirmed to exist by an unauthenticated probe: it answers 401
+   * with a key and 404 without one, which is how this API distinguishes a
+   * real route from an unknown one. The request/response *shape* is still
+   * unverified, so parsing stays defensive.
+   *
+   * Dubbing is a project flow: create returns an id, and the result is polled
+   * on `GET /v1/dubbing/studio/{id}`.
+   */
+  async submitDubbing({ key, file, fileName, targetLanguage, modelId }) {
+    if (!file || !(file instanceof Uint8Array) || file.byteLength === 0) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请先上传要配音的源音频",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+    if (!targetLanguage) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请选择目标语言",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+
+    const form = new FormData();
+    form.set("file", new Blob([file], { type: "audio/mpeg" }), fileName ?? "source.mp3");
+    form.set("target_lang", targetLanguage);
+    if (modelId) form.set("model_id", modelId);
+
+    const { data, requestId } = await this.#request({
+      method: "POST",
+      path: "/v1/dubbing",
+      key,
+      body: form,
+    });
+
+    const projectId = data?.dubbing_project_id ?? data?.id ?? null;
+    if (!projectId) {
+      throw normalizedError({
+        code: "PROVIDER_REJECTED",
+        safeMessage: "供应商未返回配音项目 id，无法继续查询",
+        retryable: false,
+        submissionCertainty: "unknown",
+        providerRequestId: requestId,
+      });
+    }
+
+    return {
+      remoteId: String(projectId),
+      state: mapDubbingStatus(String(data?.status ?? "")),
+      requestId,
+    };
+  }
+
+  /**
+   * Dubbing, step 2 of 2 — `GET /v1/dubbing/studio/{id}`.
+   *
+   * A finished project exposes generated files; only then is there an
+   * artifact to fetch.
+   */
+  async pollDubbing({ key, remoteId }) {
+    const { data, requestId } = await this.#request({
+      method: "GET",
+      path: `/v1/dubbing/studio/${encodeURIComponent(remoteId)}`,
+      key,
+    });
+
+    const state = mapDubbingStatus(String(data?.status ?? ""));
+    const files = Array.isArray(data?.generated_files) ? data.generated_files : [];
+
+    return {
+      state,
+      requestId,
+      // Recorded, not fetched: resolving a download is a separate call with
+      // its own authorization decision.
+      generatedFileUrls: files
+        .map((f) => (typeof f?.url === "string" ? f.url : null))
+        .filter(Boolean),
+      errorMessage: state === "failed" ? String(data?.error ?? "配音失败") : null,
+    };
+  }
+
+  /**
+   * Download a finished artifact. The URL is server-provided (recorded during
+   * polling), and the key is attached here in-process — the browser never
+   * sees a signed URL or a key.
+   */
+  async fetchArtifact({ key, url }) {
+    if (!url) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "没有可取回的产物地址",
+        retryable: false,
+        submissionCertainty: "unknown",
+      });
+    }
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "产物地址必须是 https",
+        retryable: false,
+        submissionCertainty: "accepted",
+      });
+    }
+    const res = await this.#config.fetchImpl(url, {
+      headers: { "xi-api-key": key },
+    });
+    if (!res.ok) {
+      throw normalizedError({
+        code: "PROVIDER_REJECTED",
+        safeMessage: `产物下载失败（HTTP ${res.status}）`,
+        retryable: true,
+        submissionCertainty: "accepted",
+      });
+    }
+    return {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType: res.headers.get("content-type") ?? "application/octet-stream",
+    };
+  }
+
   /** Synchronous TTS has nothing to poll. */
   async getStatus() {
     throw normalizedError({
@@ -751,6 +878,29 @@ function mapRemoteStatus(status) {
     case "error":
     case "cancelled":
     case "canceled":
+      return "failed";
+    default:
+      return "unknown";
+  }
+}
+
+/**
+ * Dubbing status -> local state. Dubbing uses its own vocabulary rather than
+ * the image/video one, so it gets its own mapping instead of sharing.
+ */
+function mapDubbingStatus(status) {
+  switch (status) {
+    case "pending":
+    case "queued":
+    case "in_progress":
+    case "processing":
+      return "running";
+    case "finished":
+    case "completed":
+    case "done":
+      return "completed";
+    case "failed":
+    case "error":
       return "failed";
     default:
       return "unknown";

@@ -232,7 +232,11 @@ export class JobRunner {
 
     let out;
     try {
-      out = await adapter.pollStatus({ key, remoteId: job.requestId });
+      // Dubbing has its own status vocabulary, so its own poll entry point.
+      out =
+        job.type === "dubbing"
+          ? await adapter.pollDubbing({ key, remoteId: job.requestId })
+          : await adapter.pollStatus({ key, remoteId: job.requestId });
     } catch (err) {
       // A failed poll says nothing about the generation itself.
       return {
@@ -273,7 +277,8 @@ export class JobRunner {
 
     // completed — fetch the artifact through the adapter so the URL is
     // resolved server-side with the key, never by the browser.
-    if (!out.artifactUrl) {
+    const artifactUrl = out.artifactUrl ?? out.generatedFileUrls?.[0] ?? null;
+    if (!artifactUrl) {
       const stuck = this.#jobs.transition(jobId, "unknown_submission", {
         error: {
           code: "SUBMISSION_UNKNOWN",
@@ -286,7 +291,7 @@ export class JobRunner {
       return { ok: false, job: stuck, reason: "远端称完成但无产物地址" };
     }
 
-    return this.#ingest(job, adapter, key, out.artifactUrl);
+    return this.#ingest(job, adapter, key, artifactUrl);
   }
 
   /** Download a finished remote artifact into the local asset store. */
@@ -340,6 +345,26 @@ export class JobRunner {
 
   async #dispatch(adapter, job, key) {
     switch (job.type) {
+      case "dubbing": {
+        const bytes = this.#assets.read(job.input.assetId);
+        if (!bytes) {
+          throw normalizedError({
+            code: "VALIDATION_ERROR",
+            safeMessage: "引用的源文件已不存在，请重新上传",
+            retryable: false,
+            submissionCertainty: "not_submitted",
+          });
+        }
+        // Step 1 of 2: create the remote project, then poll it.
+        const created = await adapter.submitDubbing({
+          key,
+          file: bytes,
+          fileName: job.input.fileName,
+          targetLanguage: job.input.targetLanguage,
+          modelId: job.modelId ?? undefined,
+        });
+        return { async: true, ...created };
+      }
       case "speech_to_text": {
         const bytes = this.#assets.read(job.input.assetId);
         if (!bytes) {

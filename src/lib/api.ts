@@ -156,6 +156,7 @@ export interface JobRecord {
   status: string;
   revision: number;
   requestId: string | null;
+  outputAssetIds: string[];
   error: { code: string; safeMessage: string; submissionCertainty: string } | null;
   createdAt: string;
   updatedAt: string;

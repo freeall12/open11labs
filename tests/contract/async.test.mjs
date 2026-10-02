@@ -30,6 +30,7 @@ let assets;
 let vault;
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x20, 0x00, 0x20, 0x00, 0x00]);
 let calls;
 
 function makeVault() {
@@ -270,5 +271,90 @@ describe("restart resumes the poll", () => {
     expect(after.error.providerRequestId).toBe("rem_survives");
     // It is not resubmitted.
     expect(jobs.canSubmit(after).ok).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------- dubbing -- */
+
+describe("dubbing is a two-step project flow", () => {
+  it("stores the project id and stays running", async () => {
+    const { asset } = await assets.put({
+      bytes: MP3,
+      displayName: "source.mp3",
+      mediaType: "audio/mpeg",
+      origin: "uploaded",
+    });
+    const job = jobs.createOrGet({
+      intentId: "dub-1",
+      type: "dubbing",
+      providerId: "elevenlabs",
+      modelId: "v2",
+      credentialRef: vault.list()[0].id,
+      input: { assetId: asset.id, targetLanguage: "en" },
+    }).job;
+
+    let adapter;
+    const r = new JobRunner({
+      jobs,
+      assets,
+      cost,
+      vault,
+      adapters: {
+        elevenlabs: {
+          async submitDubbing(input) {
+            adapter = input;
+            return { remoteId: "proj_9", state: "running", requestId: "req_d" };
+          },
+          async pollDubbing() {
+            return { state: "running" };
+          },
+        },
+      },
+    });
+
+    const out = await r.run(job.id);
+    expect(out.ok).toBe(true);
+    expect(out.pendingRemote).toBe("proj_9");
+    expect(jobs.get(job.id).requestId).toBe("proj_9");
+    // The source bytes came from the asset store, not the snapshot.
+    expect(adapter.file.byteLength).toBeGreaterThan(0);
+  });
+
+  it("treats an unrecognised dubbing status as still running", async () => {
+    const { asset } = await assets.put({
+      bytes: MP3,
+      displayName: "s.mp3",
+      mediaType: "audio/mpeg",
+      origin: "uploaded",
+    });
+    const job = jobs.createOrGet({
+      intentId: "dub-2",
+      type: "dubbing",
+      providerId: "elevenlabs",
+      credentialRef: vault.list()[0].id,
+      input: { assetId: asset.id, targetLanguage: "en" },
+    }).job;
+
+    const r = new JobRunner({
+      jobs,
+      assets,
+      cost,
+      vault,
+      adapters: {
+        elevenlabs: {
+          async submitDubbing() {
+            return { remoteId: "proj_u", state: "running" };
+          },
+          async pollDubbing() {
+            return { state: "unknown" };
+          },
+        },
+      },
+    });
+
+    await r.run(job.id);
+    const out = await r.poll(job.id);
+    expect(out.ok).toBe(false);
+    expect(jobs.get(job.id).status).toBe("running");
   });
 });

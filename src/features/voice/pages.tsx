@@ -4,6 +4,7 @@ import type { RouteEntry } from "@/app/route-manifest";
 import { TtsPage as TtsPageBody } from "@/features/voice/TtsPage";
 import { StsPage as StsPageBody } from "@/features/voice/StsPage";
 import { IsolatorPage as IsolatorPageBody } from "@/features/voice/IsolatorPage";
+import { DubbingPage as DubbingPageBody } from "@/features/voice/DubbingPage";
 
 /* ==========================================================================
    VOICE module — voice library, cloning/design, TTS, STS, STT, isolation,
@@ -45,7 +46,11 @@ export function IsolatorPage() {
 }
 export const SttPage = page("stt");
 export const SpeakersPage = page("speakers");
-export const DubbingPage = page("dubbing");
+export function DubbingPage() {
+  const route = routeById("dubbing");
+  if (!route) throw new Error("unknown route: dubbing");
+  return <PageFrame route={route}><DubbingPageBody /></PageFrame>;
+}
 export const AudioDetectorPage = page("audio-detector");
 
 /** Re-exported so the router can type its registry without importing types twice. */
