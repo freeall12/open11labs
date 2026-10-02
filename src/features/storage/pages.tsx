@@ -3,6 +3,7 @@ import { routeById, LOCAL_ROUTES } from "@/app/route-manifest";
 import { ProviderSettingsPage } from "@/features/core/ProviderSettingsPage";
 import { LocalJobsPageBody } from "@/features/core/LocalJobsPage";
 import { LocalStorageSettingsPageBody } from "@/features/core/LocalStorageSettingsPage";
+import { FilesPage as FilesPageBody } from "@/features/storage/FilesPage";
 
 /* ==========================================================================
    STORAGE + CORE modules.
@@ -23,7 +24,11 @@ function page(id: string) {
   };
 }
 
-export const FilesPage = page("files");
+export function FilesPage() {
+  const route = routeById("files");
+  if (!route) throw new Error("unknown route: files");
+  return <PageFrame route={route}><FilesPageBody /></PageFrame>;
+}
 export const BrandKitsPage = page("brand-kits");
 
 /** Local BYOK pages. These are additions, not replicas. */

@@ -501,13 +501,50 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       }
     }
 
+    const assetDelete = urlPath.match(/^\/api\/v1\/assets\/([^/]+)$/);
+    if (assetDelete && req.method === "DELETE") {
+      const id = assetDelete[1];
+      // Deleting an asset a project still uses is a conflict, not a silent
+      // break. The impact is reported instead.
+      const referencedBy = projects.referencesFor(id);
+      if (referencedBy.length) {
+        return json(res, 409, {
+          error: {
+            code: "REVISION_CONFLICT",
+            safeMessage: "该素材仍被工程引用，删除会破坏这些工程",
+          },
+          referencedBy,
+        });
+      }
+      const removed = assets.remove(id);
+      log({ event: "asset.removed", id, removed });
+      return json(res, removed ? 200 : 404, { removed });
+    }
+
     /* -- projects ----------------------------------------------------- */
     if (urlPath === "/api/v1/projects" && req.method === "GET") {
       return json(res, 200, { projects: projects.list() });
     }
+    if (urlPath === "/api/v1/folders" && req.method === "GET") {
+      return json(res, 200, { folders: projects.listFolders() });
+    }
+    if (urlPath === "/api/v1/folders" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return json(res, 201, { folder: projects.createFolder(body) });
+    }
+
     if (urlPath === "/api/v1/projects" && req.method === "POST") {
       const body = await readJsonBody(req);
       return json(res, 201, { project: projects.create(body) });
+    }
+
+    const projectDelete = urlPath.match(/^\/api\/v1\/projects\/([^/]+)$/);
+    if (projectDelete && req.method === "DELETE") {
+      // Deleting a project keeps its assets; the response says how many, so
+      // the UI can tell the user rather than silently orphaning files.
+      const out = projects.remove(projectDelete[1]);
+      log({ event: "project.removed", id: projectDelete[1], removed: out.removed });
+      return json(res, out.removed ? 200 : 404, out);
     }
 
     const projectSave = urlPath.match(/^\/api\/v1\/projects\/([^/]+)$/);

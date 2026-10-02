@@ -209,3 +209,62 @@ describe("speech to speech input handling", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });
+
+/* ------------------------------------------------ reference-aware delete -- */
+
+describe("deletion is reference-aware", () => {
+  it("refuses to delete an asset a project still uses", async () => {
+    const bytes = new Uint8Array([0x49, 0x44, 0x33, 0x40, 0x00, 0x20, 0x00, 0x03]);
+    const { asset } = await (
+      await call("/api/v1/assets", { method: "POST", raw: multipart(bytes) })
+    ).json();
+
+    const created = await call("/api/v1/projects", {
+      method: "POST",
+      body: { kind: "tts", name: "引用该素材的工程", assetRefs: [asset.id] },
+    });
+    expect(created.status).toBe(201);
+
+    const del = await call(`/api/v1/assets/${asset.id}`, { method: "DELETE" });
+    const body = await del.json();
+
+    expect(del.status).toBe(409);
+    expect(body.error.code).toBe("REVISION_CONFLICT");
+    expect(body.referencedBy).toHaveLength(1);
+    expect(body.referencedBy[0].name).toBe("引用该素材的工程");
+  });
+
+  it("deletes an unreferenced asset", async () => {
+    const bytes = new Uint8Array([0x49, 0x44, 0x33, 0x50, 0x00, 0x20, 0x00, 0x04]);
+    const { asset } = await (
+      await call("/api/v1/assets", { method: "POST", raw: multipart(bytes) })
+    ).json();
+
+    const del = await call(`/api/v1/assets/${asset.id}`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+
+    const list = await (await call("/api/v1/assets")).json();
+    expect(list.assets.some((a) => a.id === asset.id)).toBe(false);
+  });
+
+  it("deleting a project keeps its assets and says how many", async () => {
+    const bytes = new Uint8Array([0x49, 0x44, 0x33, 0x60, 0x00, 0x20, 0x00, 0x05]);
+    const { asset } = await (
+      await call("/api/v1/assets", { method: "POST", raw: multipart(bytes) })
+    ).json();
+    const { project } = await (
+      await call("/api/v1/projects", {
+        method: "POST",
+        body: { kind: "studio", name: "工程", assetRefs: [asset.id] },
+      })
+    ).json();
+
+    const del = await call(`/api/v1/projects/${project.id}`, { method: "DELETE" });
+    expect(del.status).toBe(200);
+    const body = await del.json();
+    expect(body.retainedAssets).toEqual([asset.id]);
+
+    const list = await (await call("/api/v1/assets")).json();
+    expect(list.assets.some((a) => a.id === asset.id)).toBe(true);
+  });
+});

@@ -283,6 +283,19 @@ export const assets = {
    * Upload a file. Uses FormData so the browser sets the multipart boundary;
    * the session cookie rides along and CSRF is echoed because this is a write.
    */
+  remove: (id: string) => request<{ removed: boolean }>(`/assets/${id}`, { method: "DELETE" }),
+
+  folders: () =>
+    request<{ folders: { id: string; name: string; parentId: string | null }[] }>(
+      "/folders",
+    ).then((r) => r.folders),
+
+  createFolder: (name: string) =>
+    request<{ folder: { id: string; name: string } }>("/folders", {
+      method: "POST",
+      body: { name },
+    }).then((r) => r.folder),
+
   upload: (file: File) => {
     const form = new FormData();
     form.set("file", file, file.name);
