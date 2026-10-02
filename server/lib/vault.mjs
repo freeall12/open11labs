@@ -54,6 +54,8 @@ export function toPublic(rec) {
     type: rec.type,
     displayName: rec.displayName,
     baseURL: rec.baseURL,
+    // Surfaced so the UI can say "this talks to your own machine".
+    selfHosted: Boolean(rec.selfHosted),
     maskedSecret: rec.maskedSecret,
     validationState: rec.validationState,
     validatedAt: rec.validatedAt,
@@ -86,13 +88,17 @@ export class Vault {
    * Store a credential. The secret is accepted here and never handed back:
    * there is deliberately no `reveal` method.
    */
-  put({ type, displayName, baseURL, secret }) {
+  put({ type, displayName, baseURL, secret, selfHosted = false }) {
     if (!type) throw new TypeError("type is required");
     if (!baseURL) throw new TypeError("baseURL is required");
     if (typeof secret !== "string" || secret.length === 0) {
       throw new TypeError("secret is required and must be a non-empty string");
     }
-    assertAllowedBaseURL(baseURL);
+    // A self-hosted provider is the one documented exception to the URL
+    // allowlist, and it has to be opted into explicitly. It is recorded on
+    // the credential so the UI can label it and the runner can hold it to a
+    // loopback-or-declared-host rule.
+    assertAllowedBaseURL(baseURL, { allowPrivate: selfHosted === true });
 
     const id = nextId();
     const rec = {
@@ -100,6 +106,7 @@ export class Vault {
       type,
       displayName: displayName || type,
       baseURL,
+      selfHosted: selfHosted === true,
       maskedSecret: maskSecret(secret),
       validationState: "unverified",
       validatedAt: null,
@@ -232,6 +239,9 @@ export class Vault {
 
 const DEFAULT_PROVIDER_HOSTS = {
   elevenlabs: ["api.elevenlabs.io", "api.eu.elevenlabs.io"],
+  // OpenAI-compatible local servers. Only reachable when the credential is
+  // explicitly registered as self-hosted.
+  "openai-local": ["127.0.0.1", "localhost", "[::1]"],
 };
 
 /**
@@ -247,15 +257,37 @@ export function assertAllowedBaseURL(raw, { allowPrivate = false } = {}) {
     throw new TypeError(`invalid baseURL: ${raw}`);
   }
 
-  if (url.protocol !== "https:") {
-    throw new TypeError("provider baseURL must be https");
-  }
   if (url.username || url.password) {
     throw new TypeError("baseURL must not embed credentials");
   }
 
   const host = url.hostname.toLowerCase();
-  if (allowPrivate) return url;
+  const isLoopback =
+    host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+
+  // A registered self-hosted provider may be a plain-http dev server on
+  // loopback, because that traffic never leaves the machine. It may NOT be a
+  // public host over http, where the credential would travel in clear.
+  if (url.protocol === "http:") {
+    if (allowPrivate && isLoopback) return url;
+    throw new TypeError(
+      isLoopback
+        ? "本机地址需要显式标记为自托管 Provider 才允许使用"
+        : "provider baseURL must be https",
+    );
+  }
+  if (url.protocol !== "https:") {
+    throw new TypeError("provider baseURL must be https");
+  }
+
+  if (allowPrivate) {
+    // Private ranges are only reachable for an explicitly self-hosted entry.
+    const p = host.split(".").map(Number);
+    const looksPrivate =
+      isLoopback ||
+      (p.length === 4 && (p[0] === 10 || p[0] === 192 || (p[0] === 172 && p[1] >= 16)));
+    if (looksPrivate) return url;
+  }
 
   const allowed = DEFAULT_PROVIDER_HOSTS.elevenlabs;
   if (!allowed.includes(host)) {

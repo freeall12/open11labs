@@ -29,6 +29,7 @@ import {
 } from "./lib/security.mjs";
 import { Vault, toPublic } from "./lib/vault.mjs";
 import * as providers from "../packages/providers/elevenlabs/adapter.mjs";
+import { createLocalAdapter, PROVIDER_ID as LOCAL_PROVIDER_ID } from "../packages/providers/local/openai-compatible.mjs";
 import { openDb, getSetting, setSetting } from "./lib/db.mjs";
 import { JobStore } from "./lib/jobs.mjs";
 import { CostLedger } from "./lib/cost.mjs";
@@ -190,7 +191,7 @@ function serveStatic(root, urlPath, res) {
 
 /* ----------------------------------------------------------------- api -- */
 
-function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost, assets, projects, dataDir, runner }) {
+function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, dataDir, runner, adapterForCredential }) {
   return async function handleApi(req, res, urlPath) {
     /* -- session bootstrap ------------------------------------------- */
     if (urlPath === "/api/v1/session" && req.method === "GET") {
@@ -221,9 +222,20 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       if (req.method === "GET") return json(res, 200, { providers: vault.list() });
       if (req.method === "POST") {
         const body = await readJsonBody(req);
-        const rec = vault.put(body);
-        safeLog({ event: "provider.created", id: rec.id, type: rec.type });
-        return json(res, 201, { provider: rec });
+        try {
+          const rec = vault.put(body);
+          log({ event: "provider.created", id: rec.id, type: rec.type });
+          return json(res, 201, { provider: rec });
+        } catch (err) {
+          // A rejected baseURL, a missing secret or a missing self-hosted
+          // opt-in is the caller's problem, not a server fault.
+          return json(res, 400, {
+            error: {
+              code: err.code ?? "VALIDATION_ERROR",
+              safeMessage: err.message,
+            },
+          });
+        }
       }
     }
 
@@ -231,14 +243,14 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
     if (rotate && req.method === "POST") {
       const body = await readJsonBody(req);
       const rec = vault.rotate(rotate[1], body.secret);
-      safeLog({ event: "provider.rotated", id: rec.id });
+      log({ event: "provider.rotated", id: rec.id });
       return json(res, 200, { provider: rec });
     }
 
     const del = urlPath.match(/^\/api\/v1\/providers\/([^/]+)$/);
     if (del && req.method === "DELETE") {
       const ok = vault.remove(del[1]);
-      safeLog({ event: "provider.removed", id: del[1], removed: ok });
+      log({ event: "provider.removed", id: del[1], removed: ok });
       return json(res, ok ? 200 : 404, { removed: ok });
     }
 
@@ -265,8 +277,14 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       // A validation call reads the credential in-process. The HTTP layer
       // never sees it, and the adapter only issues a free capability query.
       const secret = vault.useSecret(id);
+      const adapter = adapterForCredential(id);
+      if (!adapter) {
+        return json(res, 400, {
+          error: { code: "CAPABILITY_UNAVAILABLE", safeMessage: "该 Provider 类型尚未实现适配器" },
+        });
+      }
       try {
-        const out = await providerAdapters.elevenlabs.validateCredential(secret);
+        const out = await adapter.validateCredential(secret);
         const rec = vault.markValidation(id, { state: "available" });
         log({ event: "provider.validated", id, models: out.modelCount });
         return json(res, 200, { provider: rec, result: out });
@@ -313,8 +331,17 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
     if (urlPath === "/api/v1/voices" && req.method === "GET") {
       const ids = vault.list().map((p) => p.id);
       for (const id of ids) {
+        const adapter = adapterForCredential(id);
+        // Only the hosted provider publishes a voice catalogue; a local
+        // server may not, and that is reported rather than faked.
+        if (!adapter?.listVoices) {
+          return json(res, 200, {
+            voices: [],
+            reason: "该 Provider 未提供音色列表接口",
+          });
+        }
         try {
-          const out = await providerAdapters.elevenlabs.listVoices(vault.useSecret(id));
+          const out = await adapter.listVoices(vault.useSecret(id));
           return json(res, 200, {
             voices: out.voices,
             reason: out.reason,
@@ -342,9 +369,10 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       const ids = vault.list().map((p) => p.id);
       const out = [];
       for (const id of ids) {
-        const secret = vault.useSecret(id);
+        const adapter = adapterForCredential(id);
+        if (!adapter) continue;
         try {
-          out.push(...(await providerAdapters.elevenlabs.listCapabilities(secret)));
+          out.push(...(await adapter.listCapabilities(vault.useSecret(id))));
         } catch {
           out.push({
             providerId: id,
@@ -694,7 +722,12 @@ export function createLocalServer({
   dbPath = ":memory:",
   dataDir = null,
   log = safeLog,
-  providerAdapters,
+  /**
+   * Optional adapter overrides, keyed by credential id (most specific) or by
+   * provider type. Used by the test suite to inject a stub in place of a real
+   * network call.
+   */
+  providerAdapters = {},
 }) {
   const sessions = new SessionStore();
   const db = openDb(dbPath);
@@ -706,15 +739,32 @@ export function createLocalServer({
   const assets = new AssetStore(store);
   const projects = new ProjectStore({ db });
 
-  // Adapters are keyed by provider id; ElevenLabs is the only one implemented
-  // so far. The runner is what actually talks to a provider.
-  const runner = new JobRunner({
-    jobs,
-    assets,
-    cost,
-    vault,
-    adapters: { elevenlabs: providers.elevenlabs },
-  });
+  /**
+   * One place that maps a stored credential to the adapter that can talk to
+   * it. A new provider type is added here; no page ever imports an adapter.
+   *
+   * The local adapter is built per credential because its baseURL differs per
+   * machine, and its secret is read here rather than being held by a page.
+   */
+  const adapterForCredential = (credentialRef) => {
+    if (providerAdapters[credentialRef]) return providerAdapters[credentialRef];
+    const rec = vault.get(credentialRef);
+    if (!rec) return null;
+    if (providerAdapters[rec.type]) return providerAdapters[rec.type];
+    if (rec.type === LOCAL_PROVIDER_ID) {
+      return createLocalAdapter({
+        baseURL: rec.baseURL,
+        apiKey: vault.useSecret(rec.id),
+      });
+    }
+    if (rec.type === "elevenlabs") return providers.elevenlabs;
+    return null;
+  };
+
+  const runner = new JobRunner({ jobs, assets, cost, vault, adapters: {} });
+  // Credentials can be added or removed while the process runs, so the runner
+  // resolves per job rather than from a frozen map.
+  runner.setAdapterResolver(adapterForCredential);
 
   // Anything caught mid-submit by a previous process is unresolvable until
   // someone checks upstream. Mark it before accepting new work.
@@ -730,7 +780,7 @@ export function createLocalServer({
     vault,
     sessions,
     log,
-    providerAdapters,
+    adapterForCredential,
     port,
     jobs,
     cost,

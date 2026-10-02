@@ -44,6 +44,7 @@ export class JobRunner {
   #cost;
   #vault;
   #adapters;
+  #resolveAdapter;
   #now;
 
   constructor({
@@ -59,7 +60,21 @@ export class JobRunner {
     this.#cost = cost;
     this.#vault = vault;
     this.#adapters = adapters;
+    this.#resolveAdapter = null;
     this.#now = now;
+  }
+
+  /**
+   * Resolve the adapter for a job's credential. Credentials can be added or
+   * removed while the process runs, so the mapping is looked up per job rather
+   * than frozen at construction.
+   */
+  setAdapterResolver(fn) {
+    this.#resolveAdapter = fn;
+  }
+
+  #adapterFor(job) {
+    return this.#resolveAdapter?.(job.credentialRef) ?? this.#adapters?.[job.providerId] ?? null;
   }
 
   /**
@@ -80,7 +95,7 @@ export class JobRunner {
       return { ok: false, job, reason: guard.reason };
     }
 
-    const adapter = this.#adapters[job.providerId];
+    const adapter = this.#adapterFor(job);
     if (!adapter) {
       return this.#fail(job, {
         code: "CAPABILITY_UNAVAILABLE",
@@ -218,7 +233,7 @@ export class JobRunner {
       return { ok: false, job, reason: "缺少远端任务 id，无法安全轮询" };
     }
 
-    const adapter = this.#adapters[job.providerId];
+    const adapter = this.#adapterFor(job);
     if (!adapter?.pollStatus) {
       return { ok: false, job, reason: "该 Provider 未实现轮询" };
     }
