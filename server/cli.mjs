@@ -48,6 +48,7 @@ const { server, jobs } = createLocalServer({
   vault,
   port,
   dbPath: join(dataDir, "db", "meta.db"),
+  dataDir,
 });
 
 server.listen(port, "127.0.0.1", () => {

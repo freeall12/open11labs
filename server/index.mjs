@@ -14,6 +14,8 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, normalize, extname, resolve } from "node:path";
 
+const joinPath = join;
+
 import {
   RequestRejected,
   SessionStore,
@@ -30,6 +32,9 @@ import * as providers from "../packages/providers/elevenlabs/adapter.mjs";
 import { openDb, getSetting, setSetting } from "./lib/db.mjs";
 import { JobStore } from "./lib/jobs.mjs";
 import { CostLedger } from "./lib/cost.mjs";
+import { AssetStore } from "./lib/assets.mjs";
+import { ProjectStore, RevisionConflictError } from "./lib/projects.mjs";
+import { buildBundle, validateBundle, writeBundle } from "./lib/backup.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -141,7 +146,7 @@ function serveStatic(root, urlPath, res) {
 
 /* ----------------------------------------------------------------- api -- */
 
-function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost }) {
+function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost, assets, projects, dataDir }) {
   return async function handleApi(req, res, urlPath) {
     /* -- session bootstrap ------------------------------------------- */
     if (urlPath === "/api/v1/session" && req.method === "GET") {
@@ -322,6 +327,93 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       return json(res, 200, { budget: cost.setBudget(body) });
     }
 
+    /* -- assets ------------------------------------------------------- */
+    if (urlPath === "/api/v1/assets" && req.method === "GET") {
+      return json(res, 200, { assets: assets.list(), usage: assets.usage() });
+    }
+
+    const assetFile = urlPath.match(/^\/api\/v1\/assets\/([^/]+)$/);
+    if (assetFile && req.method === "GET") {
+      const rec = assets.get(assetFile[1]);
+      if (!rec) {
+        return json(res, 404, { error: { code: "NOT_FOUND", message: "unknown asset" } });
+      }
+      // The path is resolved server-side; the client never sees one.
+      const bytes = assets.read(assetFile[1]);
+      if (!bytes) {
+        return json(res, 404, { error: { code: "ASSET_IMPORT_FAILED", message: "file missing on disk" } });
+      }
+      res.writeHead(200, {
+        "content-type": rec.mediaType,
+        "content-length": bytes.byteLength,
+        "x-content-type-options": "nosniff",
+        "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(rec.displayName)}`,
+      });
+      return res.end(Buffer.from(bytes));
+    }
+
+    /* -- projects ----------------------------------------------------- */
+    if (urlPath === "/api/v1/projects" && req.method === "GET") {
+      return json(res, 200, { projects: projects.list() });
+    }
+    if (urlPath === "/api/v1/projects" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return json(res, 201, { project: projects.create(body) });
+    }
+
+    const projectSave = urlPath.match(/^\/api\/v1\/projects\/([^/]+)$/);
+    if (projectSave && req.method === "PUT") {
+      const body = await readJsonBody(req);
+      try {
+        return json(res, 200, { project: projects.save(projectSave[1], body) });
+      } catch (err) {
+        if (err instanceof RevisionConflictError) {
+          // Conflict is a real answer, not a server fault.
+          return json(res, 409, {
+            error: {
+              code: err.code,
+              safeMessage: err.message,
+              expectedRevision: err.expectedRevision,
+              actualRevision: err.actualRevision,
+            },
+          });
+        }
+        throw err;
+      }
+    }
+
+    /* -- backup ------------------------------------------------------- */
+    if (urlPath === "/api/v1/backup" && req.method === "POST") {
+      const bundle = buildBundle({
+        projects: projects.list(),
+        assets: assets.list(),
+        jobs: jobs.list(),
+        cost: cost.summary(),
+        generatedAt: new Date().toISOString(),
+      });
+      const out = writeBundle(joinPath(dataDir ?? process.cwd(), "exports"), bundle);
+      log({ event: "backup.written", projects: bundle.counts.projects, assets: bundle.counts.assets });
+      return json(res, 201, { bundle, sha256: out.sha256 });
+    }
+
+    if (urlPath === "/api/v1/backup/validate" && req.method === "POST") {
+      const bundle = await readJsonBody(req, 64 * 1024 * 1024);
+      try {
+        const checked = validateBundle(bundle);
+        return json(res, 200, {
+          valid: true,
+          counts: { projects: checked.projects.length, assets: checked.assets.length },
+          totalBytes: checked.totalBytes,
+        });
+      } catch (err) {
+        // A rejected bundle is a client answer, not a server fault.
+        return json(res, 400, {
+          valid: false,
+          error: { code: "VALIDATION_ERROR", safeMessage: err.message },
+        });
+      }
+    }
+
     /* -- vault health ------------------------------------------------ */
     if (urlPath === "/api/v1/vault" && req.method === "GET") {
       return json(res, 200, {
@@ -346,6 +438,7 @@ export function createLocalServer({
   vault,
   port: listenPort,
   dbPath = ":memory:",
+  dataDir = null,
   log = safeLog,
   providerAdapters,
 }) {
@@ -353,6 +446,11 @@ export function createLocalServer({
   const db = openDb(dbPath);
   const jobs = new JobStore({ db });
   const cost = new CostLedger({ db });
+  // Assets and projects only need a real root when the server has a data dir;
+  // tests run entirely in memory.
+  const store = dataDir ? { db, root: dataDir } : { db, root: process.cwd() };
+  const assets = new AssetStore(store);
+  const projects = new ProjectStore({ db });
 
   // Anything caught mid-submit by a previous process is unresolvable until
   // someone checks upstream. Mark it before accepting new work.
@@ -364,7 +462,18 @@ export function createLocalServer({
   let actualPort = listenPort;
   const port = () => actualPort;
 
-  const api = createApi({ vault, sessions, log, providerAdapters, port, jobs, cost });
+  const api = createApi({
+    vault,
+    sessions,
+    log,
+    providerAdapters,
+    port,
+    jobs,
+    cost,
+    assets,
+    projects,
+    dataDir,
+  });
 
   const server = createServer(async (req, res) => {
     const urlPath = (req.url ?? "/").split("?")[0];

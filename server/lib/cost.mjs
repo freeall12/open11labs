@@ -216,6 +216,59 @@ export class CostLedger {
   }
 
   /**
+   * Reserve budget *and* create the job in one transaction.
+   *
+   * The previous advisory `checkBudget` could be passed by two concurrent
+   * submissions and both proceed, which is the overspend the spec forbids.
+   * Here the insert either happens with the reservation or not at all.
+   *
+   * @param {object} opts
+   * @param {import('./jobs.mjs').JobStore} opts.jobs
+   * @param {{ estimatedAmount?: number, currency?: string, acknowledgeUnknown?: boolean }} opts.budget
+   * @param {object} jobInput
+   * @returns {{ allowed: boolean, reason?: string, job?: object, created?: boolean }}
+   */
+  createJobWithReservation({ jobs, budget, jobInput }) {
+    const decision = this.checkBudget(budget);
+    if (!decision.allowed) return { allowed: false, reason: decision.reason };
+
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      const committed = this.committed(this.budget().currency ?? "USD");
+      // Re-check under the write lock: another submission may have reserved
+      // space between the advisory check above and here.
+      if (
+        typeof budget.estimatedAmount === "number" &&
+        this.budget().limit !== null &&
+        committed + budget.estimatedAmount > this.budget().limit
+      ) {
+        this.#db.exec("ROLLBACK");
+        return { allowed: false, reason: "并发提交已占满预算，请重试" };
+      }
+
+      const { job, created } = jobs.createOrGet(jobInput);
+      // An unpriced submission is recorded as unknown, never as an estimate of
+      // zero — see the unknown-amount rule in record().
+      const priced = typeof budget.estimatedAmount === "number";
+      this.record({
+        jobId: job.id,
+        providerId: job.providerId,
+        state: priced ? "estimated" : "unknown",
+        amount: budget.estimatedAmount,
+        unit: budget.unit ?? null,
+        currency: budget.currency ?? null,
+        source: budget.priceSource ?? null,
+        asOf: budget.priceAsOf ?? null,
+      });
+      this.#db.exec("COMMIT");
+      return { allowed: true, job, created };
+    } catch (err) {
+      this.#db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
+  /**
    * What this budget does and does not control. Surfaced verbatim in the UI so
    * the local limit is not mistaken for a provider-side guarantee.
    */
