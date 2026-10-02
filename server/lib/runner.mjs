@@ -23,6 +23,7 @@
    ========================================================================== */
 
 import { filenameFor } from "./assets.mjs";
+import { downloadAudio } from "./ytdlp.mjs";
 import { normalizedError } from "../../packages/contracts/src/index.mjs";
 
 /** What a provider adapter must hand back for a successful synchronous job. */
@@ -118,7 +119,11 @@ export class JobRunner {
         }
         this.#jobs.transition(jobId, "running");
         const json = new TextEncoder().encode(
-          JSON.stringify(out.transcript, null, 2),
+          JSON.stringify(
+            { ...out.transcript, source: out.videoMeta ?? null, audioAssetId: out.sourceAssetId ?? null },
+            null,
+            2,
+          ),
         );
         const imported = await this.#assets.put({
           bytes: json,
@@ -345,6 +350,39 @@ export class JobRunner {
 
   async #dispatch(adapter, job, key) {
     switch (job.type) {
+      case "youtube_transcription": {
+        // Open-source first: yt-dlp extracts the audio, then transcription
+        // runs on the user's own provider. No third-party transcript service.
+        const fetched = await downloadAudio(job.input.url, {
+          maxBytes: job.input.maxBytes,
+        });
+        // Persist the audio before doing anything that costs money, so a
+        // crash between download and transcription keeps the source.
+        const { asset } = await this.#assets.put({
+          bytes: fetched.bytes,
+          displayName: fetched.filename,
+          mediaType: "audio/mpeg",
+          origin: "youtube",
+          sourceJobId: job.id,
+          licenseSource: `YouTube 音轨：${fetched.title ?? ""}（仅供本地转写）`,
+        });
+        return {
+          ...(await adapter.submitStt({
+            key,
+            audio: fetched.bytes,
+            fileName: fetched.filename,
+            modelId: job.modelId ?? undefined,
+            languageCode: job.input.languageCode,
+            options: job.input.options,
+          })),
+          sourceAssetId: asset.id,
+          videoMeta: {
+            title: fetched.title,
+            videoId: fetched.videoId,
+            durationSeconds: fetched.durationSeconds,
+          },
+        };
+      }
       case "dubbing": {
         const bytes = this.#assets.read(job.input.assetId);
         if (!bytes) {

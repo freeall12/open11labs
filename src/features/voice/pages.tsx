@@ -5,6 +5,7 @@ import { TtsPage as TtsPageBody } from "@/features/voice/TtsPage";
 import { StsPage as StsPageBody } from "@/features/voice/StsPage";
 import { IsolatorPage as IsolatorPageBody } from "@/features/voice/IsolatorPage";
 import { DubbingPage as DubbingPageBody } from "@/features/voice/DubbingPage";
+import { YoutubeTranscription } from "@/features/voice/YoutubeTranscription";
 
 /* ==========================================================================
    VOICE module — voice library, cloning/design, TTS, STS, STT, isolation,
@@ -34,6 +35,17 @@ export const VoiceDesignPage = page("voice-design");
 export const CreateVoiceAliasPage = page("voice-create-alias");
 export const MyVoicesPage = page("my-voices");
 export const VoiceCollectionPage = page("voice-collection");
+/** A local addition, not part of the upstream route set. */
+export function SttYoutubePage() {
+  const route = routeById("stt");
+  if (!route) throw new Error("unknown route: stt");
+  return (
+    <PageFrame route={route}>
+      <YoutubeTranscription />
+    </PageFrame>
+  );
+}
+
 export function StsPage() {
   const route = routeById("sts");
   if (!route) throw new Error("unknown route: sts");

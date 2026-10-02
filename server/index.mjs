@@ -35,6 +35,7 @@ import { CostLedger } from "./lib/cost.mjs";
 import { AssetStore } from "./lib/assets.mjs";
 import { ProjectStore, RevisionConflictError } from "./lib/projects.mjs";
 import { JobRunner } from "./lib/runner.mjs";
+import { isAvailable as ytdlpAvailable } from "./lib/ytdlp.mjs";
 import { buildBundle, validateBundle, writeBundle } from "./lib/backup.mjs";
 
 const MIME = {
@@ -289,6 +290,22 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
           },
         });
       }
+    }
+
+    /* -- local tools -------------------------------------------------- */
+    if (urlPath === "/api/v1/tools" && req.method === "GET") {
+      // Availability is probed, not assumed, so the UI can say plainly when a
+      // helper binary is missing instead of failing at submit time.
+      return json(res, 200, {
+        tools: [
+          {
+            id: "yt-dlp",
+            purpose: "下载公开 YouTube 音频以供本地转写",
+            available: await ytdlpAvailable(),
+            install: "brew install yt-dlp",
+          },
+        ],
+      });
     }
 
     /* -- voices ------------------------------------------------------- */

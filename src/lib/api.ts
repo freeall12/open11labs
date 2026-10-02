@@ -285,6 +285,13 @@ export const assets = {
    */
   remove: (id: string) => request<{ removed: boolean }>(`/assets/${id}`, { method: "DELETE" }),
 
+  /** Read a stored text asset (transcript) through the controlled URL. */
+  readText: async (id: string) => {
+    const res = await fetch(`${BASE}/assets/${id}`, { credentials: "same-origin" });
+    if (!res.ok) throw new ApiError(res.status, "ASSET_READ_FAILED", "无法读取产物");
+    return res.text();
+  },
+
   folders: () =>
     request<{ folders: { id: string; name: string; parentId: string | null }[] }>(
       "/folders",
