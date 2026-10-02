@@ -147,7 +147,7 @@ function serveStatic(root, urlPath, res) {
 
 /* ----------------------------------------------------------------- api -- */
 
-function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost, assets, projects, dataDir }) {
+function createApi({ vault, sessions, log, providerAdapters = providers, port, jobs, cost, assets, projects, dataDir, runner }) {
   return async function handleApi(req, res, urlPath) {
     /* -- session bootstrap ------------------------------------------- */
     if (urlPath === "/api/v1/session" && req.method === "GET") {
@@ -497,6 +497,16 @@ export function createLocalServer({
   const assets = new AssetStore(store);
   const projects = new ProjectStore({ db });
 
+  // Adapters are keyed by provider id; ElevenLabs is the only one implemented
+  // so far. The runner is what actually talks to a provider.
+  const runner = new JobRunner({
+    jobs,
+    assets,
+    cost,
+    vault,
+    adapters: { elevenlabs: providers.elevenlabs },
+  });
+
   // Anything caught mid-submit by a previous process is unresolvable until
   // someone checks upstream. Mark it before accepting new work.
   const reconciled = jobs.reconcileAfterRestart();
@@ -518,6 +528,7 @@ export function createLocalServer({
     assets,
     projects,
     dataDir,
+    runner,
   });
 
   const server = createServer(async (req, res) => {

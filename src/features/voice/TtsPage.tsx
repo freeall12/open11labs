@@ -186,6 +186,7 @@ export function TtsPage() {
       const found = list.find((j) => j.id === id) ?? null;
       setJob(found);
       if (found?.status === "succeeded") {
+        // Read the artifact back through the controlled URL, never a path.
         const res = await assetsApi.list();
         const first = res.assets[0] as { url: string; displayName: string } | undefined;
         if (first) setResult({ url: first.url, name: first.displayName });

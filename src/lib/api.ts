@@ -212,7 +212,27 @@ export const jobs = {
       `/jobs/${id}/cancel`,
       { method: "POST" },
     ),
+
+  /**
+   * Execute one step. The server refuses to run a job that is in flight,
+   * already succeeded, or of unknown submission, so a double click is safe.
+   */
+  run: (id: string) =>
+    request<{ job: JobRecord; asset: AssetRecord | null; reason: string | null }>(
+      `/jobs/${id}/run`,
+      { method: "POST" },
+    ),
 };
+
+export interface AssetRecord {
+  id: string;
+  url: string;
+  displayName: string;
+  mediaType: string;
+  byteSize: number;
+  origin: string;
+  licenseSource: string | null;
+}
 
 export interface CostSummary {
   money: { currency: string; total: number; entries: number }[];
