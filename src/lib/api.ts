@@ -222,6 +222,16 @@ export const jobs = {
       `/jobs/${id}/run`,
       { method: "POST" },
     ),
+
+  /** One polling step for an asynchronous job. */
+  poll: (id: string) =>
+    request<{
+      job: JobRecord;
+      asset: AssetRecord | null;
+      reason: string | null;
+      stillRunning: boolean;
+      remoteSucceeded: boolean;
+    }>(`/jobs/${id}/poll`, { method: "POST" }),
 };
 
 export interface AssetRecord {

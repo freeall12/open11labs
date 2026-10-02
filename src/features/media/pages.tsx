@@ -1,5 +1,6 @@
 import { PageFrame } from "@/features/shared/PageFrame";
 import { routeById } from "@/app/route-manifest";
+import { ImageVideoPage as ImageVideoPageBody } from "@/features/media/ImageVideoPage";
 
 /* ==========================================================================
    MEDIA module — sound effects, music, image/video/lipsync.
@@ -22,5 +23,10 @@ export const MusicPage = page("music");
 export const MusicHistoryPage = page("music-history");
 export const MusicSavedPage = page("music-saved");
 export const MusicFinetunesPage = page("music-finetunes");
-export const ImageVideoPage = page("image-video");
+/** Image/video/lipsync share one page; the mode comes from ?modality=. */
+export function ImageVideoPage() {
+  const route = routeById("image-video");
+  if (!route) throw new Error("unknown route: image-video");
+  return <PageFrame route={route}><ImageVideoPageBody /></PageFrame>;
+}
 export const MediaHistoryPage = page("media-history");
