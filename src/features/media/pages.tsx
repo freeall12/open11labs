@@ -1,6 +1,7 @@
 import { PageFrame } from "@/features/shared/PageFrame";
 import { routeById } from "@/app/route-manifest";
 import { ImageVideoPage as ImageVideoPageBody } from "@/features/media/ImageVideoPage";
+import { SfxPage as SfxPageBody } from "@/features/media/SfxPage";
 
 /* ==========================================================================
    MEDIA module — sound effects, music, image/video/lipsync.
@@ -16,7 +17,11 @@ function page(id: string) {
   };
 }
 
-export const SfxPage = page("sfx");
+export function SfxPage() {
+  const route = routeById("sfx");
+  if (!route) throw new Error("unknown route: sfx");
+  return <PageFrame route={route}><SfxPageBody /></PageFrame>;
+}
 export const SfxHistoryPage = page("sfx-history");
 export const SfxFavoritesPage = page("sfx-favorites");
 export const MusicPage = page("music");

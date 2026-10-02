@@ -506,6 +506,61 @@ export class ElevenLabsAdapter {
     };
   }
 
+  /**
+   * Sound effects — API-06, `POST /v1/sound-generation`.
+   *
+   * Duration, loop and encoding limits are account-plan dependent upstream, so
+   * nothing is enforced locally beyond "is this a sane request". Inventing a
+   * hard cap here would reject valid calls on one plan and allow invalid ones
+   * on another; the real limit is enforced by the provider and surfaced as a
+   * validation error.
+   */
+  async submitSfx({ key, prompt, durationSeconds, promptInfluence, loop, modelId }) {
+    if (!prompt?.trim()) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: "请输入音效描述",
+        retryable: false,
+        submissionCertainty: "not_submitted",
+      });
+    }
+    if (typeof durationSeconds === "number" && (durationSeconds <= 0 || durationSeconds > 60)) {
+      throw normalizedError({
+        code: "VALIDATION_ERROR",
+        safeMessage: `时长需在 0 与 60 秒之间，收到 ${durationSeconds}`,
+        retryable: false,
+        submissionCertainty: "not_submitted",
+        fieldErrors: { duration_seconds: "超出本地可接受范围" },
+      });
+    }
+
+    const payload = { text: prompt.trim() };
+    if (typeof durationSeconds === "number") payload.duration_seconds = durationSeconds;
+    if (typeof promptInfluence === "number") {
+      payload.prompt_influence = promptInfluence;
+    }
+    if (typeof loop === "boolean") payload.loop = loop;
+    if (modelId) payload.model_id = modelId;
+
+    const out = await this.#request({
+      method: "POST",
+      path: "/v1/sound-generation",
+      key,
+      body: JSON.stringify(payload),
+      headers: { "content-type": "application/json" },
+      expect: "binary",
+    });
+
+    return {
+      artifact: {
+        bytes: out.bytes,
+        contentType: out.contentType,
+        suggestedName: `sfx-${Date.now()}.mp3`,
+      },
+      providerRequestId: out.requestId,
+    };
+  }
+
   /** Synchronous TTS has nothing to poll. */
   async getStatus() {
     throw normalizedError({

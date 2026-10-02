@@ -311,6 +311,15 @@ export class JobRunner {
 
   async #dispatch(adapter, job, key) {
     switch (job.type) {
+      case "sound_generation":
+        return adapter.submitSfx({
+          key,
+          prompt: job.input.prompt,
+          durationSeconds: job.input.durationSeconds,
+          promptInfluence: job.input.promptInfluence,
+          loop: job.input.loop,
+          modelId: job.modelId ?? undefined,
+        });
       case "speech_to_speech": {
         // The input arrives as a stored asset, not inline bytes, so the job
         // snapshot never carries audio.

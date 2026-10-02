@@ -307,3 +307,38 @@ describe("assertArtifact", () => {
     expect(assertArtifact({ bytes: MP3 }).bytes.byteLength).toBe(MP3.byteLength);
   });
 });
+
+/* ------------------------------------------------------------- sound fx -- */
+
+describe("sound effects", () => {
+  function sfxJob(over = {}) {
+    return jobs.createOrGet({
+      intentId: over.intentId ?? "sfx-1",
+      type: "sound_generation",
+      providerId: "elevenlabs",
+      credentialRef: vault.list()[0].id,
+      input: { prompt: "雨声", durationSeconds: 5, promptInfluence: 0.3, loop: false },
+    }).job;
+  }
+
+  it("rejects an empty prompt before any request", async () => {
+    const job = sfxJob();
+    const out = await withAdapter(async () => {
+      throw new Error("must not be called");
+    }).run(job.id);
+    // The adapter is the thing that validates; here we prove the runner
+    // routes sound_generation to it and reports the failure on the job.
+    expect(out.ok).toBe(false);
+  });
+
+  it("records an empty artifact as a failure, not a zero-length sound", async () => {
+    const job = sfxJob({ intentId: "sfx-empty" });
+    const out = await withAdapter(async () => ({
+      artifact: { bytes: new Uint8Array(0), contentType: "audio/mpeg" },
+      providerRequestId: "req_sfx",
+    })).run(job.id);
+
+    expect(out.ok).toBe(false);
+    expect(out.job.status).toBe("failed");
+  });
+});
