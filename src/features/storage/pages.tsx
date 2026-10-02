@@ -1,6 +1,8 @@
 import { PageFrame } from "@/features/shared/PageFrame";
-import { routeById } from "@/app/route-manifest";
-import { LOCAL_ROUTES } from "@/app/route-manifest";
+import { routeById, LOCAL_ROUTES } from "@/app/route-manifest";
+import { ProviderSettingsPage } from "@/features/core/ProviderSettingsPage";
+import { LocalJobsPageBody } from "@/features/core/LocalJobsPage";
+import { LocalStorageSettingsPageBody } from "@/features/core/LocalStorageSettingsPage";
 
 /* ==========================================================================
    STORAGE + CORE modules.
@@ -41,7 +43,7 @@ export function LocalProviderSettingsPage() {
         adaptation: "本地扩展页面，非原站复刻",
       }}
     >
-      <LocalPlaceholder summary={meta.summary} />
+      <ProviderSettingsPage />
     </PageFrame>
   );
 }
@@ -62,7 +64,7 @@ export function LocalStorageSettingsPage() {
         adaptation: "本地扩展页面，非原站复刻",
       }}
     >
-      <LocalPlaceholder summary={meta.summary} />
+      <LocalStorageSettingsPageBody />
     </PageFrame>
   );
 }
@@ -83,19 +85,7 @@ export function LocalJobsPage() {
         adaptation: "本地扩展页面，非原站复刻",
       }}
     >
-      <LocalPlaceholder summary={meta.summary} />
+      <LocalJobsPageBody />
     </PageFrame>
-  );
-}
-
-function LocalPlaceholder({ summary }: { summary: string }) {
-  return (
-    <section className="stack gap-3">
-      <p className="text-sm text-foreground">{summary}</p>
-      <p className="text-sm text-secondary">
-        本页由 M0-T03（本地服务端与钥匙金库）和 M1-T04/M1-T05
-        （Provider 适配器、任务队列）填充。在密钥金库落地前不显示任何可输入或可提交的真实控件。
-      </p>
-    </section>
   );
 }

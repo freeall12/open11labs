@@ -154,7 +154,11 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       // mint a session, and without CORS headers it cannot read this anyway.
       assertHost(req, port());
       const origin = req.headers.origin;
-      if (origin) assertOrigin({ ...req, method: "POST" }, port());
+      // Force the mutating path: an IncomingMessage is not safely spreadable,
+      // and the check only matters for writes.
+      if (origin) {
+        assertOrigin({ method: "POST", headers: req.headers }, port());
+      }
 
       const session = sessions.issue();
       return json(
