@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# AppleDouble resource forks (created on exFAT/external volumes)
+._*
+
+# Tooling caches from other agents in this workspace
+.v2c/
+.video_agent/
+.vite/
+.zcodeignore
+
+# Captured reference corpus from the live site (47MB).
+# Excluded because it contains rendered account identifiers (gmail addresses
+# appear in the text dumps and in the profile-menu screenshots) plus verbatim
+# DOM snapshots of elevenlabs.io. Keep it local; do not publish it.
+research/
+

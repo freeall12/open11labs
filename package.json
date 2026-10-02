@@ -1,0 +1,30 @@
+{
+  "name": "elevenlabs-byok-clone",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Open-source BYOK ElevenLabs clone — frontend replica of the Studio home page.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

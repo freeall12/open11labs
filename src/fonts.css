@@ -1,0 +1,41 @@
+/* ==========================================================================
+   Waldenburg fallback.
+
+   Waldenburg is a licensed ElevenLabs typeface and is intentionally NOT
+   bundled here. What ships instead is a metric-compatible stand-in built from
+   the site's own `Waldenburg Fallback` @font-face overrides, so headings keep
+   the exact optical size and line box of the original.
+
+   To use the real face, drop the licensed files into /public/fonts/ and
+   uncomment the block below.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Waldenburg Fallback";
+  src: local("Arial"), local("Helvetica"), local("Liberation Sans");
+  ascent-override: 89.65%;
+  descent-override: 22.9%;
+  line-gap-override: 9.35%;
+  size-adjust: 106.97%;
+}
+
+/* Semi-condensed cut, used by the hero display type.
+@font-face {
+  font-family: "Waldenburg";
+  src: url("/fonts/Waldenburg_Regular-s.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Waldenburg";
+  src: url("/fonts/Waldenburg_Medium-s.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Waldenburg";
+  src: url("/fonts/Waldenburg_Bold-s.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+*/

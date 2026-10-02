@@ -1,0 +1,364 @@
+/* ==========================================================================
+   Design tokens — extracted from the live ElevenLabs app stylesheet
+   (elevenlabs.io/app/home, CSS chunk 3b7xev0_eu9bg.css).
+
+   Every value below was read out of the production stylesheet, not guessed.
+   Grey ramp values are bare HSL channel triplets, exactly as the site ships
+   them, so `hsl(var(--gray-600) / 0.5)` style composition keeps working.
+   Transparent greys are 8-digit hex (black in light, white in dark).
+   ========================================================================== */
+
+@import "tailwindcss";
+
+/* ---------- Static scale: identical in both themes ---------- */
+
+@theme {
+  /* Grey ramp (HSL channels) */
+  --color-gray-50: 0 0% 98%;
+  --color-gray-75: 0 0% 93%;
+  --color-gray-100: 0 0% 89%;
+  --color-gray-150: 0 0% 85%;
+  --color-gray-200: 0 0% 81%;
+  --color-gray-250: 0 0% 76%;
+  --color-gray-300: 0 0% 72%;
+  --color-gray-350: 0 0% 68%;
+  --color-gray-400: 0 0% 64%;
+  --color-gray-450: 0 0% 59%;
+  --color-gray-500: 0 0% 55%;
+  --color-gray-550: 0 0% 50%;
+  --color-gray-600: 0 0% 46%;
+  --color-gray-650: 0 0% 41%;
+  --color-gray-700: 0 0% 36%;
+  --color-gray-750: 0 0% 32%;
+  --color-gray-800: 0 0% 27%;
+  --color-gray-850: 0 0% 23%;
+  --color-gray-900: 0 0% 18%;
+  --color-gray-925: 0 0% 13%;
+  --color-gray-950: 0 0% 9%;
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Waldenburg is ElevenLabs' proprietary display face. The metrics below are
+     the site's own `Waldenburg Fallback` @font-face overrides, so text keeps
+     the same optical size even when the licensed file is absent. Drop
+     Waldenburg_*.woff2 into /public/fonts and uncomment the @font-face block
+     in fonts.css to switch to the real face. */
+  --font-waldenburg: "Waldenburg", "Waldenburg Fallback", "Inter", ui-sans-serif,
+    system-ui, sans-serif;
+
+  /* Radii */
+  --radius-sm: 0.125rem;
+  --radius-default: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-component: 0.5rem;
+
+  /* Light sweep that crosses the prompt-bar avatar. */
+  --animate-orb-shimmer: orb-shimmer 3.2s ease-in-out infinite;
+
+  /* The signature ElevenLabs "natural" shadow: a 1px ring plus two soft
+     falloffs, all in near-black at 6% alpha. */
+  --shadow-natural-xs: 0 0px 0px 1px #0000000f, 0 1px 1px -0.5px #0000000f,
+    0 3px 3px -1.5px #0000000f;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- Theme-dependent tokens ----------
+   `inline` makes utilities emit var(--token) so .dark can override them. */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-secondary: var(--secondary);
+  --color-subtle: var(--subtle);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-gray-alpha-50: var(--gray-alpha-50);
+  --color-gray-alpha-75: var(--gray-alpha-75);
+  --color-gray-alpha-100: var(--gray-alpha-100);
+  --color-gray-alpha-150: var(--gray-alpha-150);
+  --color-gray-alpha-200: var(--gray-alpha-200);
+  --color-gray-alpha-250: var(--gray-alpha-250);
+  --color-gray-alpha-300: var(--gray-alpha-300);
+  --color-gray-alpha-350: var(--gray-alpha-350);
+  --color-gray-alpha-400: var(--gray-alpha-400);
+  --color-gray-alpha-450: var(--gray-alpha-450);
+  --color-gray-alpha-500: var(--gray-alpha-500);
+  --color-gray-alpha-550: var(--gray-alpha-550);
+  --color-gray-alpha-600: var(--gray-alpha-600);
+  --color-gray-alpha-650: var(--gray-alpha-650);
+  --color-gray-alpha-700: var(--gray-alpha-700);
+  --color-gray-alpha-750: var(--gray-alpha-750);
+  --color-gray-alpha-800: var(--gray-alpha-800);
+  --color-gray-alpha-850: var(--gray-alpha-850);
+  --color-gray-alpha-900: var(--gray-alpha-900);
+  --color-gray-alpha-925: var(--gray-alpha-925);
+  --color-gray-alpha-950: var(--gray-alpha-950);
+}
+
+/* ---------- Light theme (default) ---------- */
+
+:root {
+  --background: 0 0% 100%;
+  --background-alt: 0 0% 99%;
+  --foreground: 240 3% 6%;
+
+  --primary: var(--gray-900);
+  --primary-foreground: 210 20% 98%;
+  --secondary: var(--darken-500);
+  --subtle: var(--darken-450);
+  --muted: var(--darken-100);
+  --accent: var(--gray-100);
+  --accent-foreground: var(--gray-900);
+  --border: var(--gray-alpha-150);
+  --input: 220 13% 91%;
+  --ring: 224 71.4% 4.1%;
+  --card: var(--background);
+  --popover: var(--background);
+
+  /* Transparent greys: black at low alpha */
+  --darken-50: #00000005;
+  --darken-75: #00000008;
+  --darken-100: #0000000b;
+  --darken-150: #00000013;
+  --darken-200: #0000001a;
+  --darken-250: #00000002;
+  --darken-300: #00000029;
+  --darken-350: #00000041;
+  --darken-400: #00000059;
+  --darken-450: #00000070;
+  --darken-500: #00000087;
+  --darken-550: #00000095;
+  --darken-600: #000000a4;
+  --darken-650: #000000ad;
+  --darken-700: #000000b6;
+  --darken-750: #000000c2;
+  --darken-800: #000000cd;
+  --darken-850: #000000d4;
+  --darken-900: #000000db;
+  --darken-925: #000000df;
+  --darken-950: #000000e3;
+
+  --gray-alpha-50: var(--darken-50);
+  --gray-alpha-75: var(--darken-75);
+  --gray-alpha-100: var(--darken-100);
+  --gray-alpha-150: var(--darken-150);
+  --gray-alpha-200: var(--darken-200);
+  --gray-alpha-250: var(--darken-250);
+  --gray-alpha-300: var(--darken-300);
+  --gray-alpha-350: var(--darken-350);
+  --gray-alpha-400: var(--darken-400);
+  --gray-alpha-450: var(--darken-450);
+  --gray-alpha-500: var(--darken-500);
+  --gray-alpha-550: var(--darken-550);
+  --gray-alpha-600: var(--darken-600);
+  --gray-alpha-650: var(--darken-650);
+  --gray-alpha-700: var(--darken-700);
+  --gray-alpha-750: var(--darken-750);
+  --gray-alpha-800: var(--darken-800);
+  --gray-alpha-850: var(--darken-850);
+  --gray-alpha-900: var(--darken-900);
+  --gray-alpha-925: var(--darken-925);
+  --gray-alpha-950: var(--darken-950);
+
+  /* Site layout variables */
+  --advh: 1dvh;
+  --sidebar-width: 4.5rem;
+  --eleven-sidebar-width: var(--sidebar-width);
+}
+
+/* ---------- Dark theme ---------- */
+
+.dark {
+  --background: 240 3% 6%;
+  --foreground: 0 0% 100%;
+
+  --primary: 210 20% 98%;
+  --secondary: var(--lighten-600);
+  --subtle: var(--lighten-500);
+  --muted: var(--lighten-100);
+  --accent: 215 27.9% 16.9%;
+  --accent-foreground: 210 20% 98%;
+  --border: var(--gray-alpha-150);
+  --input: 215 27.9% 16.9%;
+  --ring: 216 12.2% 83.9%;
+  --card: var(--popover);
+  --popover: var(--tw-gray-900);
+
+  /* Transparent greys: white at low alpha */
+  --lighten-50: #ffffff06;
+  --lighten-75: #ffffff08;
+  --lighten-100: #ffffff0b;
+  --lighten-150: #ffffff13;
+  --lighten-200: #ffffff1a;
+  --lighten-250: #ffffff02;
+  --lighten-300: #ffffff29;
+  --lighten-350: #ffffff41;
+  --lighten-400: #ffffff59;
+  --lighten-450: #ffffff70;
+  --lighten-500: #ffffff87;
+  --lighten-550: #ffffff95;
+  --lighten-600: #ffffffa4;
+  --lighten-650: #ffffffad;
+  --lighten-700: #ffffffb6;
+  --lighten-750: #ffffffc2;
+  --lighten-800: #ffffffcd;
+  --lighten-850: #ffffffd4;
+  --lighten-900: #ffffffdb;
+  --lighten-925: #ffffffdf;
+  --lighten-950: #ffffffe3;
+
+  --gray-alpha-50: var(--lighten-50);
+  --gray-alpha-75: var(--lighten-75);
+  --gray-alpha-100: var(--lighten-100);
+  --gray-alpha-150: var(--lighten-150);
+  --gray-alpha-200: var(--lighten-200);
+  --gray-alpha-250: var(--lighten-250);
+  --gray-alpha-300: var(--lighten-300);
+  --gray-alpha-350: var(--lighten-350);
+  --gray-alpha-400: var(--lighten-400);
+  --gray-alpha-450: var(--lighten-450);
+  --gray-alpha-500: var(--lighten-500);
+  --gray-alpha-550: var(--lighten-550);
+  --gray-alpha-600: var(--lighten-600);
+  --gray-alpha-650: var(--lighten-650);
+  --gray-alpha-700: var(--lighten-700);
+  --gray-alpha-750: var(--lighten-750);
+  --gray-alpha-800: var(--lighten-800);
+  --gray-alpha-850: var(--lighten-850);
+  --gray-alpha-900: var(--lighten-900);
+  --gray-alpha-925: var(--lighten-925);
+  --gray-alpha-950: var(--lighten-950);
+}
+
+:root {
+  --tw-gray-900: 0 0% 18%;
+}
+
+/* ---------- Layout offsets ----------
+   The rail only exists at `lg` and above; below that the upstream app uses a
+   modal drawer instead, so no horizontal offset is applied.
+
+   These rules are deliberately NOT inside @layer: the `:root` token defaults
+   above are unlayered, and unlayered declarations outrank layered ones in the
+   cascade regardless of specificity. */
+
+.app-sidebar {
+  width: 0;
+}
+
+@media (min-width: 1024px) {
+  [data-sidebar-open="true"] {
+    --eleven-sidebar-width: 16rem;
+  }
+
+  [data-sidebar-open="true"] .app-content {
+    padding-left: 16rem;
+  }
+
+  [data-sidebar-open="true"] .app-sidebar {
+    width: 16rem;
+  }
+}
+
+
+@keyframes orb-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    position: relative;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: hsl(var(--foreground) / 0.14);
+  }
+}
+
+/* ---------- Custom utilities (names taken from the live stylesheet) ---------- */
+
+@utility stack {
+  display: flex;
+  flex-direction: column;
+}
+
+@utility hstack {
+  display: flex;
+  flex-direction: row;
+}
+
+@utility center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@utility scroll-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--gray-300)) transparent;
+  overflow: auto;
+}
+
+/* Port of the site's focus treatment: a 1.5px ring in the current text colour
+   with the background punched out behind it. */
+@utility focus-ring {
+  &:focus-visible {
+    --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(
+        1.5px + var(--tw-ring-offset-width)
+      ) var(--tw-ring-color, currentcolor);
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
+      var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    --tw-ring-offset-color: var(--background-color, hsl(var(--background)));
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+
+  @media (forced-colors: active) {
+    &:focus-visible {
+      outline: 2px solid #0000;
+      outline-offset: 2px;
+    }
+  }
+}
