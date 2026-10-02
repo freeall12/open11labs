@@ -92,7 +92,7 @@ describe("asset store", () => {
   it("rejects unsupported media types", async () => {
     await expect(
       assets.put({ bytes: new Uint8Array([1]), displayName: "x.exe", origin: "upload" }),
-    ).rejects.toThrow(/unsupported/);
+    ).rejects.toThrow(/无法识别的素材类型/);
   });
 
   it("rejects a file over the local size limit", async () => {

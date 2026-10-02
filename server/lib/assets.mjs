@@ -124,9 +124,32 @@ export class AssetStore {
    *           origin: string, sourceJobId?: string|null, licenseSource?: string|null }} input
    */
   async put({ bytes, displayName, mediaType, origin, sourceJobId = null, licenseSource = null }) {
-    const type = mediaType ?? sniffType(displayName);
-    if (!type || !ALLOWED.has(extname(displayName).toLowerCase())) {
-      const err = new TypeError(`unsupported asset type: ${displayName}`);
+    // Sniff the container from the bytes. A client-declared Content-Type is
+    // untrusted input: curl sends application/octet-stream for a .wav, and a
+    // caller could declare anything at all.
+    const sniffed = sniffContainer(bytes);
+    const ext = extname(displayName).toLowerCase();
+    // A generic content type means "I do not know", not "I claim otherwise",
+    // so it is not treated as a contradicting declaration.
+    const GENERIC = new Set(["", "application/octet-stream", "binary/octet-stream"]);
+    const rawDeclared = mediaType ?? ALLOWED.get(ext) ?? null;
+    const declared = rawDeclared && !GENERIC.has(rawDeclared) && ALLOWED.has(ext)
+      ? rawDeclared
+      : null;
+    const type = sniffed ?? declared;
+
+    if (!type) {
+      const err = new TypeError(
+        `无法识别的素材类型：${displayName}（既不匹配文件头，也不匹配已知扩展名）`,
+      );
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+    // A declared type that contradicts the bytes is a mismatch worth refusing.
+    if (sniffed && declared && sniffed.split(";")[0] !== declared.split(";")[0]) {
+      const err = new TypeError(
+        `文件内容（${sniffed}）与声明的类型（${declared}）不一致`,
+      );
       err.code = "VALIDATION_ERROR";
       throw err;
     }
@@ -309,6 +332,25 @@ function hashBytes(bytes) {
 
 function sniffType(name) {
   return ALLOWED.get(extname(name).toLowerCase()) ?? null;
+}
+
+/**
+ * Read the real container from the file's magic bytes. Returns null when the
+ * header is not recognised, so the caller can fall back to the extension.
+ */
+function sniffContainer(bytes) {
+  if (!bytes || bytes.byteLength < 12) return null;
+  const tag = (o, n) => String.fromCharCode(...bytes.subarray(o, o + n));
+  if (tag(0, 4) === "RIFF" && tag(8, 4) === "WAVE") return "audio/wav";
+  if (tag(0, 4) === "fLaC") return "audio/flac";
+  if (tag(0, 4) === "OggS") return "audio/ogg";
+  if (tag(0, 3) === "ID3") return "audio/mpeg";
+  if (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0) return "audio/mpeg";
+  if (tag(4, 4) === "ftyp") return "audio/mp4";
+  if (bytes[0] === 0x89 && tag(1, 3) === "PNG") return "image/png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  if (tag(0, 4) === "RIFF" && tag(8, 4) === "WEBP") return "image/webp";
+  return null;
 }
 
 /**

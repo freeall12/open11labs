@@ -292,6 +292,18 @@ export const assets = {
     return res.text();
   },
 
+  /** Local analysis — no provider involved. */
+  probe: (id: string) =>
+    request<{
+      supported: boolean;
+      format: string;
+      durationSeconds: number | null;
+      reason: string | null;
+      waveform: number[] | null;
+      silenceSpans: [number, number][] | null;
+      computedBy: "local";
+    }>(`/assets/${id}/probe`),
+
   folders: () =>
     request<{ folders: { id: string; name: string; parentId: string | null }[] }>(
       "/folders",

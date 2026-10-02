@@ -36,6 +36,7 @@ import { AssetStore } from "./lib/assets.mjs";
 import { ProjectStore, RevisionConflictError } from "./lib/projects.mjs";
 import { JobRunner } from "./lib/runner.mjs";
 import { isAvailable as ytdlpAvailable } from "./lib/ytdlp.mjs";
+import { probeAudio, waveformPeaks } from "./lib/media.mjs";
 import { buildBundle, validateBundle, writeBundle } from "./lib/backup.mjs";
 
 const MIME = {
@@ -536,6 +537,40 @@ function createApi({ vault, sessions, log, providerAdapters = providers, port, j
       const removed = assets.remove(id);
       log({ event: "asset.removed", id, removed });
       return json(res, removed ? 200 : 404, { removed });
+    }
+
+    /* -- local media probe (works with zero providers) ------------------ */
+    const assetProbe = urlPath.match(/^\/api\/v1\/assets\/([^/]+)\/probe$/);
+    if (assetProbe && req.method === "GET") {
+      const rec = assets.get(assetProbe[1]);
+      if (!rec) {
+        return json(res, 404, { error: { code: "NOT_FOUND", message: "unknown asset" } });
+      }
+      if (!rec.mediaType.startsWith("audio/")) {
+        return json(res, 200, {
+          supported: false,
+          reason: "本地解析目前只覆盖音频容器",
+        });
+      }
+      const bytes = assets.read(assetProbe[1]);
+      if (!bytes) {
+        return json(res, 404, {
+          error: { code: "ASSET_IMPORT_FAILED", message: "文件在磁盘上已不存在" },
+        });
+      }
+      const info = probeAudio(bytes);
+      const wave = waveformPeaks(bytes, { bars: 120 });
+      return json(res, 200, {
+        supported: info.ok,
+        format: info.format,
+        durationSeconds: info.durationSeconds,
+        reason: info.reason ?? null,
+        waveform: wave ? wave.peaks : null,
+        silenceSpans: wave ? wave.silenceSpans : null,
+        // Stated so the UI can attribute it: this number came from the
+        // bytes, not from a model or a provider.
+        computedBy: "local",
+      });
     }
 
     /* -- projects ----------------------------------------------------- */
