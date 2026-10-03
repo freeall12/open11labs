@@ -203,6 +203,10 @@ export function VoicePickerDialog({
   const [language, setLanguage] = useState("all");
   const [categories, setCategories] = useState<string[]>([]);
   const [tab, setTab] = useState<"explore" | "mine">("explore");
+  // A local/self-hosted speech server publishes no voice catalogue, so without
+  // a manual entry the dialog dead-ends and TTS is unselectable there. The id
+  // is the user's own; it is echoed back verbatim, never invented.
+  const [manual, setManual] = useState("");
 
   const languages = useMemo(() => languagesOf(items), [items]);
 
@@ -339,6 +343,37 @@ export function VoicePickerDialog({
             ))}
           </ul>
         )}
+
+        <details className="text-xs text-secondary">
+          <summary className="cursor-pointer">手动输入音色 ID</summary>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              placeholder="voice_xxxxxxxxxxxx"
+              aria-label="手动音色 ID"
+              className="focus-ring h-9 flex-1 rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none"
+            />
+            <button
+              type="button"
+              disabled={!manual.trim()}
+              onClick={() =>
+                onChange({
+                  voiceId: manual.trim(),
+                  name: manual.trim(),
+                  category: null,
+                  previewUrl: null,
+                  labels: {},
+                  availableForTiers: null,
+                  unverified: true,
+                })
+              }
+              className="focus-ring h-9 shrink-0 rounded-lg border border-gray-alpha-200 px-3 text-xs hover:bg-gray-alpha-50 disabled:opacity-40"
+            >
+              使用此 ID
+            </button>
+          </div>
+        </details>
       </div>
     </Modal>
   );

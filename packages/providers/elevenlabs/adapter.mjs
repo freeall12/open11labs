@@ -323,6 +323,10 @@ export class ElevenLabsAdapter {
    * @param {{ key: string, voiceId: string, text: string,
    *           modelId?: string, outputFormat?: string }} input
    */
+  async submitTextToSpeech(input) {
+    return this.submit(input);
+  }
+
   async submit({ key, voiceId, text, modelId, outputFormat = "mp3_44100_128" }) {
     if (!voiceId) {
       throw normalizedError({

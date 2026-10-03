@@ -561,8 +561,17 @@ export class JobRunner {
           params: job.input.params,
         });
       }
-      case "text_to_speech":
-        return adapter.submit({
+      case "text_to_speech": {
+        // `submit` historically meant TTS on the hosted adapter and chat on
+        // the OpenAI-compatible local one, so dispatching TTS through it sent
+        // speech requests to a chat endpoint (and recorded a text "reply" as
+        // audio). Prefer the explicit entry point; the legacy fallback keeps
+        // hosted adapters and stubs that only define `submit` working.
+        const tts =
+          typeof adapter.submitTextToSpeech === "function"
+            ? adapter.submitTextToSpeech.bind(adapter)
+            : adapter.submit.bind(adapter);
+        return tts({
           key,
           voiceId: job.input.voiceId,
           text: job.input.text,
@@ -570,6 +579,7 @@ export class JobRunner {
           outputFormat: job.input.outputFormat,
           params: job.input.params,
         });
+      }
       case "image_generation":
       case "video_generation": {
         // Answers immediately with a remote id; the caller polls afterwards.

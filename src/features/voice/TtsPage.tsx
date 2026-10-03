@@ -121,6 +121,19 @@ const LANGUAGE_COVERAGE = [
 ];
 
 /**
+ * Short stable digest of what is being synthesized. Same input → same id
+ * (idempotent retry); any edit → a new id (a new paid submission).
+ */
+function contentDigest(text: string, format: string, language: string): string {
+  let h = 5381;
+  const s = `${text}\u0000${format}\u0000${language}`;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
  * The reference's starter prompts. They are prompts, not generations: the
  * upstream page actually synthesises when one is clicked, which costs money
  * against a real key, so clicking here only fills the text box. Generating
@@ -265,6 +278,7 @@ export function TtsPage() {
   const [result, setResult] = useState<{ url: string; name: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const { text, modelId, voiceId, format, language, params, speakerBoost } = draft;
   const [voice, setVoice] = useState<VoiceRecord | null>(null);
@@ -332,17 +346,21 @@ export function TtsPage() {
 
   /**
    * One intent per attempt. Re-clicking while a job is in flight reuses the
-   * same id, so the server's UNIQUE index collapses it to one job.
+   * same id, so the server's UNIQUE index collapses it to one job. The
+   * content digest is part of the id: otherwise editing the text and
+   * regenerating would be collapsed into the OLD job and the reuse note
+   * would claim an identical submission that never happened.
    */
-  const intentId = useMemo(
-    () => `tts:${provider?.id ?? "none"}:${modelId}:${voiceId || "novoice"}`,
-    [provider?.id, modelId, voiceId],
-  );
+  const intentId = useMemo(() => {
+    const digest = contentDigest(text, format, language);
+    return `tts:${provider?.id ?? "none"}:${modelId}:${voiceId || "novoice"}:${digest}`;
+  }, [provider?.id, modelId, voiceId, text, format, language]);
 
   async function generate() {
     if (!provider) return;
     setSubmitting(true);
     setSubmitError(null);
+    setNote(null);
     try {
       const res = await jobsApi.create({
         intentId,
@@ -367,6 +385,23 @@ export function TtsPage() {
         },
       });
       setJob(res.job);
+      if (!res.created) {
+        // Same intent as the last attempt: the server collapsed it to one job.
+        // Re-running would submit (and charge) a second time.
+        setNote("与上次提交完全相同，已复用对应任务，不会重复计费。");
+        return;
+      }
+      // A draft job does nothing on its own — dispatch it. Every other tool
+      // page does this; without the run call the job stays in `draft` forever
+      // and the poll below never sees a terminal state.
+      const run = await jobsApi.run(res.job.id);
+      setJob(run.job);
+      // A synchronous adapter finishes inside run(); the poll below only
+      // starts for jobs still in flight, so surface the artifact here or the
+      // player never appears for them.
+      if (run.asset) {
+        setResult({ url: run.asset.url, name: run.asset.displayName });
+      }
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : "提交失败");
     } finally {
@@ -511,6 +546,7 @@ export function TtsPage() {
           </label>
 
           {submitError && <Notice tone="error">{submitError}</Notice>}
+          {note && <Notice tone="info">{note}</Notice>}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

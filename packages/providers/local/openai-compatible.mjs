@@ -21,6 +21,15 @@ import { redact } from "../lib/transport.mjs";
 
 export const PROVIDER_ID = "openai-local";
 
+/** Map our output-format ids onto the OpenAI speech `response_format` set. */
+function formatOf(outputFormat) {
+  const id = String(outputFormat ?? "").toLowerCase();
+  for (const f of ["mp3", "opus", "aac", "flac", "wav", "pcm"]) {
+    if (id.startsWith(f)) return { id: f, ext: f };
+  }
+  return { id: "mp3", ext: "mp3" };
+}
+
 export class LocalOpenAIAdapter {
   #baseURL;
   #apiKey;
@@ -43,6 +52,12 @@ export class LocalOpenAIAdapter {
   }
 
   async #post(path, body) {
+    const res = await this.#request(path, body);
+    return res.json();
+  }
+
+  /** Shared POST: transport, timeouts and error mapping for every route. */
+  async #request(path, body) {
     if (!this.#baseURL) {
       throw normalizedError({
         code: "VALIDATION_ERROR",
@@ -88,7 +103,7 @@ export class LocalOpenAIAdapter {
           submissionCertainty: "unknown",
         });
       }
-      return res.json();
+      return res;
     } catch (err) {
       if (err?.code) throw err;
       const aborted = err?.name === "AbortError";
@@ -182,6 +197,21 @@ export class LocalOpenAIAdapter {
         supportsStreaming: false,
         supportsIdempotency: false,
       }),
+      capability({
+        providerId: PROVIDER_ID,
+        modelId: "local-tts",
+        displayName: "本地语音合成",
+        taskType: "text_to_speech",
+        // Whether the local server actually serves /v1/audio/speech is only
+        // known at submit time; the capability is advertised honestly as
+        // unverified, never as equivalent to the hosted voices.
+        availability: "unverified",
+        reason: "本地语音服务是否可用取决于其是否提供 /v1/audio/speech；能力未核验",
+        supportsCancel: false,
+        supportsStatusQuery: false,
+        supportsStreaming: false,
+        supportsIdempotency: false,
+      }),
     ];
   }
 
@@ -214,6 +244,53 @@ export class LocalOpenAIAdapter {
         suggestedName: "reply.txt",
       },
       providerRequestId: data?.id ?? null,
+    };
+  }
+
+  /**
+   * Text to speech against /v1/audio/speech. The response is raw audio bytes,
+   * not JSON, so this does not go through #post. Used when the user routes
+   * TTS to a self-hosted speech server — the fully-offline pipeline this
+   * adapter's header promises.
+   */
+  async submitTextToSpeech({ key: _key, text, modelId, voiceId, outputFormat, params }) {
+    const fmt = formatOf(outputFormat);
+    const res = await this.#request("/v1/audio/speech", {
+      model: modelId ?? "tts-1",
+      input: text ?? "",
+      voice: voiceId ?? "alloy",
+      response_format: fmt.id,
+      ...(typeof params?.speed === "number" ? { speed: params.speed } : {}),
+    });
+
+    const contentType = res.headers.get("content-type") ?? `audio/${fmt.id}`;
+    if (/^application\/json/i.test(contentType)) {
+      // A JSON body here is an error object that happened to return 2xx-shaped
+      // metadata, never audio.
+      const body = await res.text().catch(() => "");
+      throw normalizedError({
+        code: "PROVIDER_REJECTED",
+        safeMessage: `本地语音服务未返回音频（content-type: ${contentType}）：${redact(body, this.#apiKey, 160)}`,
+        retryable: false,
+        submissionCertainty: "unknown",
+      });
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length === 0) {
+      throw normalizedError({
+        code: "PROVIDER_REJECTED",
+        safeMessage: "本地语音服务返回了空音频",
+        retryable: false,
+        submissionCertainty: "accepted",
+      });
+    }
+    return {
+      artifact: {
+        bytes,
+        contentType,
+        suggestedName: `speech.${fmt.ext}`,
+      },
+      providerRequestId: res.headers.get("x-request-id") ?? null,
     };
   }
 
