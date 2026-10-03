@@ -71,14 +71,14 @@ export function PromptBar() {
   }
 
   return (
-    <div className="stack relative w-full max-w-[650px] cursor-text rounded-[32px]">
+    <div className="stack relative w-full max-w-[650px] cursor-text rounded-[26px]">
       {/* Three stacked shadow layers produce the site's 1px ring + soft edge.
           Each layer carries the radius itself: an absolutely positioned child
           does not inherit the parent's border-radius, so without this the
           shadow paints a square box around a pill. */}
-      <div className="absolute inset-0 rounded-[32px] bg-background shadow-natural-xs" />
-      <div className="absolute inset-0 rounded-[32px] shadow-natural-xs" />
-      <div className="absolute inset-0 rounded-[32px] shadow-natural-xs" />
+      <div className="absolute inset-0 rounded-[26px] bg-background shadow-natural-xs" />
+      <div className="absolute inset-0 rounded-[26px] shadow-natural-xs" />
+      <div className="absolute inset-0 rounded-[26px] shadow-natural-xs" />
 
       <div className="relative flex">
         <div className="m-2 mr-0 flex h-9 w-9 shrink-0 items-center justify-center">

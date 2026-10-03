@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { VoicePickerDialog } from "@/features/voice/VoicePicker";
+import { Modal } from "@/features/shared/Modal";
 import { PROMPT_HANDOFF_KEY } from "@/components/PromptBar";
 import {
   AdvancedToggle,
@@ -788,67 +789,46 @@ function ModelDialog({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="选择模型"
-        className="relative flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-background shadow-2xl"
-      >
-        <header className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
-          <span className="text-sm font-medium text-foreground">选择模型</span>
+    <Modal open onClose={onClose} title="选择模型" width="max-w-lg">
+      <div role="radiogroup" aria-label="模型" className="flex flex-col gap-1">
+        {TTS_MODELS.map((m) => (
           <button
+            key={m.id}
             type="button"
-            onClick={onClose}
-            aria-label="关闭"
-            className="focus-ring rounded-[10px] p-1 text-secondary hover:bg-gray-alpha-50"
+            role="radio"
+            aria-checked={value === m.id}
+            onClick={() => onChange(m.id)}
+            className={`focus-ring flex w-full flex-col gap-1.5 rounded-xl px-3 py-3 text-left transition-colors ${
+              value === m.id ? "bg-gray-alpha-100" : "hover:bg-gray-alpha-50"
+            }`}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-foreground">{m.label}</span>
+              <span className="rounded-full border border-gray-alpha-200 px-1.5 py-px text-[11px] leading-4 text-secondary">
+                {m.badge}
+              </span>
+            </span>
+            <span className="text-xs text-secondary">{m.note}</span>
+            <span className="flex flex-wrap items-center gap-1">
+              {m.sampleLangs.map((l) => (
+                <span
+                  key={l}
+                  className="rounded-full bg-gray-alpha-50 px-1.5 py-px text-[11px] leading-4 text-secondary"
+                >
+                  {l}
+                </span>
+              ))}
+              <span className="text-[11px] leading-4 text-subtle">
+                +{Math.max(m.languages - m.sampleLangs.length, 0)} 个…
+              </span>
+            </span>
+            <span className="text-xs text-subtle">
+              上限 {m.maxChars} 字符 · 能力未经真实调用核验
+            </span>
           </button>
-        </header>
-        <div role="radiogroup" aria-label="模型" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          {TTS_MODELS.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={value === m.id}
-              onClick={() => onChange(m.id)}
-              className={`focus-ring flex w-full flex-col gap-1.5 rounded-xl px-3 py-3 text-left transition-colors ${
-                value === m.id ? "bg-gray-alpha-100" : "hover:bg-gray-alpha-50"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-foreground">{m.label}</span>
-                <span className="rounded-full border border-gray-alpha-200 px-1.5 py-px text-[11px] leading-4 text-secondary">
-                  {m.badge}
-                </span>
-              </span>
-              <span className="text-xs text-secondary">{m.note}</span>
-              <span className="flex flex-wrap items-center gap-1">
-                {m.sampleLangs.map((l) => (
-                  <span
-                    key={l}
-                    className="rounded-full bg-gray-alpha-50 px-1.5 py-px text-[11px] leading-4 text-secondary"
-                  >
-                    {l}
-                  </span>
-                ))}
-                <span className="text-[11px] leading-4 text-subtle">
-                  +{Math.max(m.languages - m.sampleLangs.length, 0)} 个…
-                </span>
-              </span>
-              <span className="text-xs text-subtle">
-                上限 {m.maxChars} 字符 · 能力未经真实调用核验
-              </span>
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
