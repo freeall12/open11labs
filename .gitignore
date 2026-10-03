@@ -61,3 +61,7 @@ data/
 # Asset store. A server started with `--data .` writes here; 69MB of generated
 # media once landed in the worktree this way. Runtime output, never source.
 /assets/
+
+# Local verification runtime (screenshots evidence, e2e data dirs)
+out/
+data-qa/
