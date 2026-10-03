@@ -64,11 +64,25 @@ describe("defect regression marker (server)", () => {
     const secondBody = await second.json();
     const secondCookieHeader = second.headers.get("set-cookie");
 
-    // DEFECT PRESENT (D-05): a caller that already holds a live session is
-    // issued a brand-new one; the old csrf token is orphaned.
-    // ⚠️ FLIP WHEN FIXED: expect(secondBody.csrfToken).toBe(firstBody.csrfToken)
-    // and expect(secondCookieHeader).toBeNull().
-    expect(secondBody.csrfToken).not.toBe(firstBody.csrfToken);
-    expect(secondCookieHeader).not.toBeNull();
+    // FIXED (2026-10-03, ZCode): a caller holding a live session gets the
+    // SAME csrf token back and no re-issue — a second tab can no longer
+    // orphan the first tab's token.
+    expect(secondBody.csrfToken).toBe(firstBody.csrfToken);
+    expect(secondCookieHeader).toBeNull();
+
+    // The first tab's session+csrf pair must still drive a mutating call:
+    // a bootstrap must never invalidate what it echoed.
+    const probe = await fetch(`http://127.0.0.1:${PORT}/api/v1/folders`, {
+      method: "POST",
+      headers: {
+        host: HOST,
+        origin: `http://${HOST}`,
+        cookie: firstCookie,
+        "x-csrf-token": firstBody.csrfToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "d05-probe" }),
+    });
+    expect(probe.status).toBe(201);
   });
 });

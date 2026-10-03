@@ -208,6 +208,16 @@ function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, d
         assertOrigin({ method: "POST", headers: req.headers }, port());
       }
 
+      // A caller that already holds a live session keeps it. Re-issuing here
+      // would silently invalidate the csrf token every other tab of the same
+      // browser is still holding (cookies are shared per origin), turning a
+      // second tab into a CSRF_REJECTED 403 factory until a full reload.
+      const cookies = parseCookies(req.headers.cookie);
+      const existing = sessions.get(cookies.get(SESSION_COOKIE));
+      if (existing) {
+        return json(res, 200, { csrfToken: existing.csrf, createdAt: existing.createdAt });
+      }
+
       const session = sessions.issue();
       return json(
         res,
