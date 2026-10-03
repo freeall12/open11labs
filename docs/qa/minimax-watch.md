@@ -348,3 +348,10 @@
 
 - 本轮:音乐生成从「诚实拒绝」升级为「文档验证接入」——官方文档核实 POST /v1/music/compose(SDK 字段 prompt/composition_plan/music_length_ms/model_id;付费档)→ 适配器/runner/能力表/页面门禁/5 项形状测试全部落地;音乐页契约轮(074)同步完成(生成/已保存/微调页签,市场·已发布按 SCOPE 裁剪)
 - 队列:聊天(062)/图像视频(122)契约轮、files 操作列重构、参考047播放条、studio 段落单测
+
+## 2026-10-03 20:05 FEATURE循环#11(用户指令:推送GitHub/整理目录/重写README带截图)
+
+- 截图:15 页 1500×759 实拍入 docs/screenshots/(用带本地数据的 data-qa);README 重写(画廊/目录结构/能力现状/修正过时测试状态)
+- 清理:删 tmp/(28MB)/exports/;.gitignore 补 out/ data-qa/
+- ⚠️ 事故与修复:gaps.md 被我在 835b885 的脚本写爆至 169MB(未命中锚→空串 replace 逐字符插入;6.4KB→169MB),推送被 GitHub 100MB 限制拒绝 → 重建 6 个正确版本 + filter-branch 替换 23 提交内 blob → 推送成功;教训:文档追加脚本必须断言锚命中
+- 已推送 36 提交至 origin/main;遗留:公开历史 ≤7ed2f05 仍含专有 Waldenburg 字体与占位 assets(前人推送带入),清除需改写历史+force push,待用户决定
