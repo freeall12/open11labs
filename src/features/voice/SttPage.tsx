@@ -446,7 +446,7 @@ function TranscribeDialog({
             {source === "upload" && (
               <DropZone
                 onFile={pick}
-                title="点击或将文件拖放到此处上传"
+                title="点击或将文件拖到此处上传"
                 hint={`音频和视频文件，不超过 ${DOC_OBSERVED.maxMb}MB（未经 API 验证）`}
                 accept="audio/*,video/*"
               />
