@@ -24,14 +24,39 @@
 
 import { filenameFor } from "./assets.mjs";
 import { downloadAudio } from "./ytdlp.mjs";
+import { safeFetchUrl } from "./safe-fetch.mjs";
 import { normalizedError } from "../../packages/contracts/src/index.mjs";
+
+/**
+ * Display name for a fetched remote file.
+ *
+ * Only the last path segment is used, and it is sanitised: the value ends up
+ * as a local filename, so traversal segments and separators must not survive.
+ * A URL with no usable name falls back to something honest rather than
+ * pretending the fetch produced a known file.
+ */
+function displayNameForUrl(finalUrl) {
+  let last = "";
+  try {
+    last = new URL(finalUrl).pathname.split("/").filter(Boolean).pop() ?? "";
+  } catch {
+    last = "";
+  }
+  last = last.split("?")[0].split("#")[0];
+  const safe = last.replace(/[^\w.\-]+/g, "_").replace(/^\.+/, "").slice(0, 80);
+  return safe || "remote-audio";
+}
 
 /** What a provider adapter must hand back for a successful synchronous job. */
 export function assertArtifact(artifact) {
-  if (!artifact || !(artifact.bytes instanceof Uint8Array)) {
+  const bytes = artifact?.bytes;
+  // `instanceof Uint8Array` is realm-fragile: a byte view created in another
+  // context is still perfectly usable bytes, and rejecting it would turn a
+  // working adapter into a silent failure. Ask what the value actually is.
+  if (!bytes || !ArrayBuffer.isView(bytes) || bytes.BYTES_PER_ELEMENT !== 1) {
     throw new TypeError("adapter returned no bytes");
   }
-  if (artifact.bytes.byteLength === 0) {
+  if (bytes.byteLength === 0) {
     // An empty body is a failure, not a zero-length success.
     throw new TypeError("adapter returned an empty artifact");
   }
@@ -192,15 +217,19 @@ export class JobRunner {
         licenseSource: "用户自有 Provider 生成的产物",
       });
 
-      // Character cost is a metering signal. Without a verified price it is
-      // recorded as unknown, NOT converted into money and NOT recorded as 0.
+      // Metering signal, not a price. Chat providers report token counts and
+      // media providers report a character cost; either is recorded as
+      // provenance. Without a verified price it stays `unknown` — NOT
+      // converted into money and NOT recorded as 0.
       this.#cost.record({
         jobId,
         providerId: job.providerId,
         state: "unknown",
-        source: out.characterCost
-          ? `character-cost=${out.characterCost}`
-          : "no metering header",
+        source:
+          out.usageSummary ??
+          (out.characterCost
+            ? `character-cost=${out.characterCost}`
+            : "no metering header"),
       });
 
       const done = this.#jobs.transition(jobId, "succeeded", {
@@ -398,6 +427,35 @@ export class JobRunner {
           },
         };
       }
+      case "url_transcription": {
+        // A user-supplied audio URL. The fetch is credential-free, size- and
+        // time-capped, and every redirect hop is re-validated against private
+        // address space, so a public host cannot bounce us into the LAN.
+        const fetched = await safeFetchUrl(job.input.url, {
+          maxBytes: job.input.maxBytes,
+        });
+        // Persist before anything that costs money, so a crash between fetch
+        // and transcription still keeps the source.
+        const { asset } = await this.#assets.put({
+          bytes: fetched.bytes,
+          displayName: displayNameForUrl(fetched.finalUrl),
+          mediaType: fetched.contentType ?? "application/octet-stream",
+          origin: "url",
+          sourceJobId: job.id,
+          licenseSource: `用户提供的 URL：${job.input.url}`,
+        });
+        return {
+          ...(await adapter.submitStt({
+            key,
+            audio: fetched.bytes,
+            fileName: asset.displayName,
+            modelId: job.modelId ?? undefined,
+            languageCode: job.input.languageCode,
+            options: job.input.options,
+          })),
+          sourceAssetId: asset.id,
+        };
+      }
       case "dubbing": {
         const bytes = this.#assets.read(job.input.assetId);
         if (!bytes) {
@@ -417,6 +475,25 @@ export class JobRunner {
           modelId: job.modelId ?? undefined,
         });
         return { async: true, ...created };
+      }
+      case "chat": {
+        // Conversation turns go through the same job lifecycle as media, so
+        // dedup, unknown-submission and cost rules apply unchanged.
+        const out = await adapter.submit({
+          key,
+          messages: Array.isArray(job.input.messages) ? job.input.messages : [],
+          model: job.modelId ?? undefined,
+          temperature: job.input.temperature,
+          maxTokens: job.input.maxTokens,
+        });
+        const artifact = assertArtifact(out.artifact);
+        return {
+          ...out,
+          artifact: {
+            ...artifact,
+            suggestedName: artifact.suggestedName ?? `reply-${job.id}.txt`,
+          },
+        };
       }
       case "speech_to_text": {
         const bytes = this.#assets.read(job.input.assetId);
@@ -502,6 +579,12 @@ export class JobRunner {
           modelId: job.modelId ?? undefined,
           imageUrl: job.input.imageUrl,
           durationSeconds: job.input.durationSeconds,
+          // Forwarded only when the page actually set them, so a control the
+          // user left alone cannot silently change the upstream request.
+          aspectRatio: job.input.aspectRatio,
+          resolution: job.input.resolution,
+          sound: job.input.sound,
+          loop: job.input.loop,
         });
         return { async: true, ...out };
       }

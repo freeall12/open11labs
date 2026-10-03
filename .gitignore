@@ -35,6 +35,7 @@ research/
 data/
 coverage/
 test-results/
+tmp/
 playwright-report/
 *.log
 
@@ -44,6 +45,7 @@ scripts/
 scripts/*
 !scripts/check-docs.mjs
 !scripts/index-research.mjs
+!scripts/visual-audit.mjs
 
 # Icon-library bundles (~1.3MB of the source site's own minified JS).
 # Re-download with `node tools/fetch-bundles.mjs`; never commit them.
@@ -55,3 +57,7 @@ tools/.icons.json
 
 # Private runtime data (vault, assets, db, exports). Never commit.
 data/
+
+# Asset store. A server started with `--data .` writes here; 69MB of generated
+# media once landed in the worktree this way. Runtime output, never source.
+/assets/

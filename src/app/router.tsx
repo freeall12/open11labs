@@ -1,7 +1,7 @@
 import { Component, ComponentType } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
-import { EXCLUDED_PATHS, ROUTABLE_ROUTES } from "@/app/route-manifest";
+import { EXCLUDED_PATHS, LOCAL_DYNAMIC_ROUTES, ROUTABLE_ROUTES } from "@/app/route-manifest";
 
 import { HomePage } from "@/components/HomePage";
 import {
@@ -12,7 +12,6 @@ import {
   IsolatorPage,
   MyVoicesPage,
   SpeakersPage,
-  SttYoutubePage,
   StsPage,
   SttPage,
   TtsPage,
@@ -38,6 +37,7 @@ import {
   ChatSessionPage,
   FlowEditorPage,
   FlowsPage,
+  StudioEditorPage,
   StudioPage,
   StudioTemplatesPage,
 } from "@/features/editors/pages";
@@ -74,7 +74,6 @@ const PAGES: Record<string, ComponentType> = {
   sts: StsPage,
   isolator: IsolatorPage,
   stt: SttPage,
-  "stt-youtube": SttYoutubePage,
   speakers: SpeakersPage,
   dubbing: DubbingPage,
   "audio-detector": AudioDetectorPage,
@@ -141,6 +140,19 @@ export function AppRoutes() {
             />
           );
         })}
+
+        {/* Local-only dynamic routes; see LOCAL_DYNAMIC_ROUTES. */}
+        {LOCAL_DYNAMIC_ROUTES.map((r) => (
+          <Route
+            key={r.id}
+            path={r.pattern}
+            element={
+              <PageBoundary id={r.id}>
+                <StudioEditorPage />
+              </PageBoundary>
+            }
+          />
+        ))}
 
         <Route path="/app/out-of-scope" element={<OutOfScopePage />} />
         <Route path="*" element={<NotFoundPage />} />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { JobHistoryList, Notice, TableHead, useJobHistory } from "@/features/voice/ui";
 import {
   ApiError,
   assets as assetsApi,
@@ -33,6 +34,8 @@ export function IsolatorPage() {
   const [job, setJob] = useState<JobRecord | null>(null);
   const [result, setResult] = useState<{ url: string; name: string } | null>(null);
   const [source, setSource] = useState<{ url: string; name: string } | null>(null);
+  const [query, setQuery] = useState("");
+  const history = useJobHistory("audio_isolation");
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -129,6 +132,7 @@ export function IsolatorPage() {
 
       const out = await jobsApi.run(created.job.id);
       setJob(out.job);
+      await history.reload();
       if (out.asset) {
         setResult({ url: out.asset.url, name: out.asset.displayName });
       } else if (out.reason) {
@@ -153,11 +157,11 @@ export function IsolatorPage() {
       )}
 
       <Notice tone="info">
-        人声分离用于去除背景噪声，**不是**音乐分轨或乐器分离。
+        人声分离用于去除背景噪声，<strong>不是</strong>音乐分轨或乐器分离。
       </Notice>
 
       <section className="stack gap-3">
-        <h2 className="text-sm font-medium text-foreground">输入音频</h2>
+        <span className="text-sm font-medium text-foreground">输入音频</span>
         <div className="flex flex-wrap gap-2">
           <input
             ref={fileInput}
@@ -215,7 +219,7 @@ export function IsolatorPage() {
       </section>
 
       <Notice tone="warn">
-        文档计量方式为「每分钟 1000 字符」，但**未经真实调用核验**。
+        文档计量方式为「每分钟 1000 字符」，但<strong>未经真实调用核验</strong>。
         本地不会把它换算成金额，一律记为「费用未知」。
       </Notice>
       <label className="flex items-start gap-2 text-sm">
@@ -278,21 +282,25 @@ export function IsolatorPage() {
           {job.error ? ` — ${job.error.safeMessage}` : ""}
         </p>
       )}
+
+      {/* The reference lists past isolations under a 搜索历史 box with
+          名称 / 时长 / 格式 / 操作 columns (097–098). */}
+      <section className="stack gap-3">
+        <h2 className="text-sm font-medium text-foreground">历史</h2>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索历史"
+          aria-label="搜索历史"
+          className="focus-ring h-9 w-full rounded-[10px] border border-gray-alpha-150 bg-background px-3 text-sm outline-none placeholder:text-subtle"
+        />
+        <JobHistoryList
+          {...history}
+          query={query}
+          head={<TableHead columns={["名称", "时长", "格式", "操作"]} />}
+          emptyText="还没有分离历史。上传一段音频后会在此列出。"
+        />
+      </section>
     </div>
   );
-}
-
-function Notice({
-  tone,
-  children,
-}: {
-  tone: "error" | "warn" | "info";
-  children: React.ReactNode;
-}) {
-  const cls = {
-    error: "bg-red-50 text-red-700",
-    warn: "bg-amber-50 text-amber-800",
-    info: "bg-gray-alpha-50 text-secondary",
-  }[tone];
-  return <div className={`rounded-lg px-3 py-2 text-sm ${cls}`}>{children}</div>;
 }

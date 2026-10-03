@@ -125,12 +125,9 @@ describe("subprocess invocation", () => {
 });
 
 describe("availability probe", () => {
-  // Spawns the real yt-dlp binary. Under full parallel load the spawn can
-  // exceed the 5s default timeout (observed by two agents independently on
-  // 2026-10-03), which is machine jitter, not a functional failure.
   it("answers a boolean rather than assuming the tool exists", async () => {
     expect(typeof (await isAvailable())).toBe("boolean");
-  }, 20_000);
+  });
 
   it("reports false for a binary that is not installed", async () => {
     expect(await isAvailable("definitely-not-a-real-binary-xyz")).toBe(false);

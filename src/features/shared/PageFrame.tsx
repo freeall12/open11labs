@@ -14,26 +14,76 @@ export function PageFrame({
   route,
   children,
   actions,
+  bare,
+  compact,
+  showCompactHeading,
 }: {
   route: RouteEntry;
   children?: ReactNode;
   actions?: ReactNode;
+  /**
+   * Skip the frame's own heading. Pages that replicate an observed header —
+   * title plus subtitle plus a page-level action — render that themselves, and
+   * a second title above it reads as a rendering bug rather than as a heading.
+   */
+  bare?: boolean;
+  /**
+   * Tool pages, not destination pages. The reference puts a tool's name in the
+   * top bar and starts its content high on the page, instead of printing a
+   * large heading and pushing the tool down by a third of the viewport. This
+   * keeps a real `<h1>` for assistive tech — it is not `display:none`, which
+   * would drop it from the accessibility tree — while moving the visible text
+   * to the top row.
+   */
+  compact?: boolean;
+  /**
+   * Draw the compact heading instead of hiding it. Most tool pages take their
+   * name from the top bar, but 130/131 render 图像和视频 as a visible heading
+   * above the tab strip, so that page opts back in.
+   */
+  showCompactHeading?: boolean;
 }) {
-  return (
-    <div className="mx-auto w-full max-w-6xl px-5 pb-16 pt-[calc(50px+9dvh)]">
-      <header className="stack gap-2">
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-balance font-waldenburg text-3xl font-normal text-foreground">
-            {titleFor(route)}
-          </h1>
-          {actions}
-        </div>
-        {route.adaptation && (
-          <p className="text-sm text-secondary">本地化调整：{route.adaptation}</p>
-        )}
-      </header>
+  const showNotice = !children;
+  const heading = (
+    <h1 className="font-waldenburg font-normal text-foreground text-2xl">{titleFor(route)}</h1>
+  );
 
-      <div className="mt-8">{children ?? <ScopeNotice route={route} />}</div>
+  return (
+    <div
+      className={
+        compact
+          ? "mx-auto w-full max-w-6xl px-3 pb-16 pt-[calc(50px+1.5rem)] sm:px-4"
+          : "mx-auto w-full max-w-6xl px-3 pb-16 pt-[calc(50px+3rem)] sm:px-4"
+      }
+    >
+      {!bare && (
+        <header className="stack gap-2">
+          <div className="flex items-start justify-between gap-4">
+            {compact && showCompactHeading ? (
+              /* Still the real <h1>, just at the compact size. Rendering a
+                 <span> here looked right and dropped the page out of the
+                 accessibility tree — the routing test caught it. */
+              <h1 className="font-waldenburg text-2xl font-normal text-foreground">
+                {titleFor(route)}
+              </h1>
+            ) : compact ? (
+              <span className="sr-only">{heading}</span>
+            ) : (
+              <h1 className="text-balance font-waldenburg text-3xl font-normal text-foreground">
+                {titleFor(route)}
+              </h1>
+            )}
+            {actions}
+          </div>
+          {route.adaptation && (
+            <p className="text-sm text-secondary">本地化调整：{route.adaptation}</p>
+          )}
+        </header>
+      )}
+
+      <div className={bare || compact ? "" : "mt-8"}>
+        {children ?? (showNotice ? <ScopeNotice route={route} /> : null)}
+      </div>
     </div>
   );
 }
@@ -72,7 +122,10 @@ const ROUTE_TITLES: Record<string, string> = {
   flows: "Flows",
   "chat": "聊天",
   files: "素材",
-  "brand-kits": "品牌套件",
+  // 073 shows 素材 as the heading with a 素材/品牌套件 tablist, so the page
+  // title follows the parent and the tab carries the sub-page name. The top
+  // bar's own map in src/app/nav-titles.ts says the same thing.
+  "brand-kits": "素材",
   audiobooks: "有声书",
   "audio-detector": "音频检测",
   // Local BYOK extensions — these are additions, not replicas.

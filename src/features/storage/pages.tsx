@@ -3,7 +3,12 @@ import { routeById, LOCAL_ROUTES } from "@/app/route-manifest";
 import { ProviderSettingsPage } from "@/features/core/ProviderSettingsPage";
 import { LocalJobsPageBody } from "@/features/core/LocalJobsPage";
 import { LocalStorageSettingsPageBody } from "@/features/core/LocalStorageSettingsPage";
-import { FilesPage as FilesPageBody } from "@/features/storage/FilesPage";
+import {
+  FilesHeaderActions,
+  FilesPageBody,
+  useFilesController,
+} from "@/features/storage/FilesPage";
+import { BrandKitsPage as BrandKitsBody } from "@/features/editors/BooksAndKits";
 
 /* ==========================================================================
    STORAGE + CORE modules.
@@ -16,20 +21,25 @@ import { FilesPage as FilesPageBody } from "@/features/storage/FilesPage";
    surface. They are local extensions and are labelled as such on screen.
    ========================================================================== */
 
-function page(id: string) {
-  const route = routeById(id);
-  if (!route) throw new Error(`unknown route: ${id}`);
-  return function StoragePage() {
-    return <PageFrame route={route} />;
-  };
-}
-
 export function FilesPage() {
   const route = routeById("files");
   if (!route) throw new Error("unknown route: files");
-  return <PageFrame route={route}><FilesPageBody /></PageFrame>;
+  // 066-071 put 新建文件夹 / 上传 on the same row as the page heading, so
+  // they are handed to the frame as its actions rather than repeated inside
+  // the body. The controller lives here so the header buttons and the table
+  // rows below share one state.
+  const ctl = useFilesController();
+  return (
+    <PageFrame route={route} actions={<FilesHeaderActions ctl={ctl} />}>
+      <FilesPageBody ctl={ctl} />
+    </PageFrame>
+  );
 }
-export const BrandKitsPage = page("brand-kits");
+export function BrandKitsPage() {
+  const route = routeById("brand-kits");
+  if (!route) throw new Error("unknown route: brand-kits");
+  return <PageFrame route={route}><BrandKitsBody /></PageFrame>;
+}
 
 /** Local BYOK pages. These are additions, not replicas. */
 export function LocalProviderSettingsPage() {

@@ -54,8 +54,19 @@ async function bootstrap(): Promise<string> {
 async function ensureCsrf(): Promise<string> {
   if (csrfToken) return csrfToken;
   if (!bootstrapping) {
+    // The cached promise must not stay rejected. A component that mounts,
+    // unmounts and remounts while the server is briefly unreachable would
+    // otherwise replay the same failure forever, and a caller that ignores the
+    // result produces an unhandled rejection in the console for a condition the
+    // page already handles by showing an error. Clear it so the next caller
+    // retries from scratch.
     bootstrapping = bootstrap().finally(() => {
       bootstrapping = null;
+    });
+    // Nothing awaits this chain if every caller bailed; keep the rejection
+    // observed so it is reported to the page, not to the global handler.
+    bootstrapping.catch(() => {
+      csrfToken = null;
     });
   }
   return bootstrapping;
@@ -100,12 +111,19 @@ export async function request<T = unknown>(
   const data = text ? safeJson(text) : null;
 
   if (!res.ok) {
-    const err = (data as { error?: Record<string, unknown> } | null)?.error;
+    const body = (data ?? {}) as Record<string, unknown>;
+    const err = (body.error ?? {}) as Record<string, unknown>;
+    // Sibling fields belong in `details`, not just inside `error`. The server
+    // puts `referencedBy` next to `error` when a delete is refused; dropping it
+    // left the UI reading `undefined` and about to print a fabricated "0 个工程"
+    // instead of the real referencing project. Every consumer hits this trap, so
+    // it is fixed once here rather than per page.
+    const { error: _error, ...siblings } = body;
     throw new ApiError(
       res.status,
-      (err?.code as string) ?? "UNKNOWN",
-      (err?.safeMessage as string) ?? `请求失败（HTTP ${res.status}）`,
-      err ?? {},
+      (err.code as string) ?? "UNKNOWN",
+      (err.safeMessage as string) ?? `请求失败（HTTP ${res.status}）`,
+      { ...siblings, ...err },
     );
   }
   return data as T;
@@ -126,11 +144,25 @@ export function resetSession() {
 
 /* -------------------------------------------------------------- domain -- */
 
+/** Public metadata for a supported platform. No secret, no host allowlist. */
+export interface ProviderSpec {
+  id: string;
+  label: string;
+  defaultBaseURL: string;
+  keyPlaceholder: string;
+  docs: string;
+  taskTypes: string[];
+  chat: boolean;
+  requiresSelfHosted: boolean;
+}
+
 export interface ProviderRecord {
   id: string;
   type: string;
   displayName: string;
   baseURL: string;
+  /** Server-declared self-hosted opt-in; the only exception to the URL allowlist. */
+  selfHosted: boolean;
   maskedSecret: string;
   validationState:
     | "unconfigured"
@@ -163,9 +195,20 @@ export interface JobRecord {
 }
 
 export const providers = {
+  /** The supported platforms, straight from the server's registry. */
+  catalog: () =>
+    request<{ providers: ProviderSpec[] }>("/provider-catalog").then((r) => r.providers),
+
   list: () => request<{ providers: ProviderRecord[] }>("/providers").then((r) => r.providers),
 
-  add: (input: { type: string; displayName: string; baseURL: string; secret: string }) =>
+  add: (input: {
+    type: string;
+    displayName: string;
+    baseURL: string;
+    secret: string;
+    /** Required before a private/loopback baseURL is accepted by the server. */
+    selfHosted?: boolean;
+  }) =>
     request<{ provider: ProviderRecord }>("/providers", { method: "POST", body: input }).then(
       (r) => r.provider,
     ),
@@ -180,6 +223,15 @@ export const providers = {
       method: "POST",
       body: { secret },
     }).then((r) => r.provider),
+
+  /**
+   * Model ids the provider itself reports. An empty list is a real answer —
+   * it is what stops the UI from inventing a model name.
+   */
+  models: (id: string) =>
+    request<{ models: { id: string; source: string }[]; source: string }>(
+      `/providers/${id}/models`,
+    ),
 
   remove: (id: string) => request<{ removed: boolean }>(`/providers/${id}`, { method: "DELETE" }),
 };
@@ -251,6 +303,8 @@ export interface AssetRecord {
   byteSize: number;
   origin: string;
   licenseSource: string | null;
+  /** ISO timestamp from the local store; the basis for "创建于" columns. */
+  createdAt: string;
 }
 
 export interface CostSummary {
@@ -342,6 +396,17 @@ export const projects = {
       method: "POST",
       body: { variables, name },
     }).then((r) => r.project),
+
+  /** Persist an edited project body. Bumps the revision server-side. */
+  save: (id: string, content: Record<string, unknown>, name?: string) =>
+    request<{ project: ProjectRecord }>(`/projects/${id}`, {
+      method: "PUT",
+      body: { content, name },
+    }).then((r) => r.project),
+
+  /** Delete a local project. Local-only; there is no cloud copy to affect. */
+  remove: (id: string) =>
+    request<{ removed: boolean }>(`/projects/${id}`, { method: "DELETE" }),
 };
 
 export interface ProjectRecord {

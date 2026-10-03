@@ -32,7 +32,9 @@ const TITLES: Record<string, string> = {
   "music-saved": "音乐收藏",
   "music-finetunes": "音乐微调",
   "image-video": "图像和视频",
-  "media-history": "生成历史",
+  // 130/131 show the parent 图像和视频 as the heading with 历史 as the active
+  // tab, so the breadcrumb follows the parent too.
+  "media-history": "图像和视频",
   studio: "工作室",
   "studio-templates": "工作室模板",
   flows: "Flows",
@@ -40,9 +42,12 @@ const TITLES: Record<string, string> = {
   chat: "聊天",
   "chat-session": "聊天",
   files: "素材",
-  "brand-kits": "品牌套件",
+  // 073 shows 素材 as the heading with 素材/品牌套件 as a tablist, so the
+  // page title follows the parent and the tab carries the sub-page name.
+  "brand-kits": "素材",
   audiobooks: "有声书",
   "audio-detector": "音频检测",
+  "studio-editor": "工作室",
 };
 
 /** Concrete prefixes for routes that carry a path parameter. */
@@ -50,6 +55,9 @@ const DYNAMIC_PREFIXES: [string, string][] = [
   ["/app/flows/", "flow-editor"],
   ["/app/creative-agent/chats/", "chat-session"],
   ["/app/voice-library/collections/", "voice-collection"],
+  // The local editor. This path is not in routes.json (the upstream editor URL
+  // was never captured), so it needs a title of its own here.
+  ["/app/studio/", "studio-editor"],
 ];
 
 export function titleForPath(pathname: string): string {

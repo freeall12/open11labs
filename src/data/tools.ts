@@ -6,6 +6,8 @@ export type ToolId =
   | "video"
   | "dubbing"
   | "avatar"
+  | "transcribe"
+  | "audiobooks"
   | "more";
 
 export interface HomeTool {
@@ -26,6 +28,8 @@ export const HOME_TOOLS: HomeTool[] = [
   { id: "image", label: "图像", href: "/app/image-video?modality=image" },
   { id: "video", label: "视频", href: "/app/image-video?modality=video" },
   { id: "dubbing", label: "配音", href: "/app/dubbing" },
-  { id: "avatar", label: "虚拟形象", href: "/app/avatar" },
+  { id: "avatar", label: "虚拟形象", href: "/app/image-video?modality=lipsync" },
+  { id: "transcribe", label: "转录", href: "/app/speech-to-text" },
+  { id: "audiobooks", label: "有声书", href: "/app/audiobooks" },
   { id: "more", label: "更多", href: null },
 ];

@@ -12,11 +12,16 @@ import { ApiError, assets, backup } from "@/lib/api";
 export function LocalStorageSettingsPageBody() {
   const [usage, setUsage] = useState<{ totalBytes: number; count: number } | null>(null);
   const [items, setItems] = useState<unknown[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [backupNote, setBackupNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
+    // The previous version showed "0 个 / 0 B" until the request resolved, so
+    // a slow or unreachable server read as an empty disk. Loading has to be a
+    // state of its own here, exactly as it is on the other two local pages.
+    setLoading(true);
     try {
       const res = await assets.list();
       setUsage(res.usage);
@@ -24,6 +29,8 @@ export function LocalStorageSettingsPageBody() {
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "无法读取存储信息");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -49,23 +56,40 @@ export function LocalStorageSettingsPageBody() {
   return (
     <div className="stack gap-8">
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+        <div className="stack items-start gap-2 rounded-xl border border-gray-alpha-200 p-4">
+          <p role="alert" className="text-sm text-red-700">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="focus-ring h-8 rounded-[10px] border border-gray-alpha-200 px-2.5 text-sm transition-colors hover:bg-gray-alpha-50"
+          >
+            重试
+          </button>
+        </div>
       )}
 
       <section className="stack gap-3 rounded-xl border border-gray-alpha-150 p-5">
         <h2 className="text-sm font-medium text-foreground">本机数据</h2>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-secondary">已存素材</dt>
-            <dd className="text-sm text-foreground">{usage?.count ?? 0} 个</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-secondary">占用空间</dt>
-            <dd className="text-sm text-foreground">{formatBytes(usage?.totalBytes ?? 0)}</dd>
-          </div>
-        </dl>
+        {loading ? (
+          <p className="text-sm text-secondary">读取中…</p>
+        ) : (
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-secondary">已存素材</dt>
+              <dd className="text-sm text-foreground">
+                {usage ? `${usage.count} 个` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-secondary">占用空间</dt>
+              <dd className="text-sm text-foreground">
+                {usage ? formatBytes(usage.totalBytes) : "—"}
+              </dd>
+            </div>
+          </dl>
+        )}
         <p className="text-xs text-secondary">
           素材与工程保存在本机数据目录，浏览器只通过受控接口访问，不会暴露文件路径。
         </p>

@@ -216,6 +216,31 @@ export function IconSoundFx(props: IconProps) {
   );
 }
 
+/**
+ * Dubbing — a dialogue between two speakers, so a paired glyph rather than
+ * another microphone. 配音 previously borrowed the caption glyph, which made
+ * it indistinguishable from 转录 in the home tool row and the sidebar.
+ */
+export function IconDubbing(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path
+        stroke="currentColor"
+        stroke-linecap="round"
+        strokeLinejoin="round"
+        d="M6.938 3v6.375a2.625 2.625 0 1 1-1.969-2.532M9.938 5.063l3-2.063M12.938 3v3.938"
+      />
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.594 15.938v-1.5a4.5 4.5 0 0 1 4.5-4.5h1.312a4.5 4.5 0 0 1 4.5 4.5v1.5"
+      />
+      <path stroke="currentColor" strokeLinecap="round" d="M9.938 9.938h6" />
+    </Svg>
+  );
+}
+
 export function IconKey(props: IconProps) {
   return (
     <Svg {...props}>

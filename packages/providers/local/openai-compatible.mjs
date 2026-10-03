@@ -17,6 +17,7 @@
    ========================================================================== */
 
 import { capability, normalizedError, usageEntry } from "../../contracts/src/index.mjs";
+import { redact } from "../lib/transport.mjs";
 
 export const PROVIDER_ID = "openai-local";
 
@@ -79,7 +80,10 @@ export class LocalOpenAIAdapter {
         }
         throw normalizedError({
           code: "PROVIDER_REJECTED",
-          safeMessage: `本地服务返回 HTTP ${res.status}：${text.slice(0, 160)}`,
+          // The upstream body is redacted, not truncated: a local gateway can
+          // echo the Authorization header back, and a truncated raw body is
+          // still a raw body.
+          safeMessage: `本地服务返回 HTTP ${res.status}：${redact(text, this.#apiKey, 160)}`,
           retryable: res.status >= 500,
           submissionCertainty: "unknown",
         });
@@ -103,10 +107,10 @@ export class LocalOpenAIAdapter {
   }
 
   /**
-   * Reachability and identity. `/v1/models` is a read-only listing, so it is
-   * a legitimate no-generation validation.
+   * Read the model list the local server actually serves. Naming a model that
+   * was never observed would be a guess, so the UI offers only real ids.
    */
-  async validateCredential() {
+  async #getModels() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
     try {
@@ -123,8 +127,7 @@ export class LocalOpenAIAdapter {
         });
       }
       const body = await res.json().catch(() => ({}));
-      const models = Array.isArray(body?.data) ? body.data : [];
-      return { ok: true, modelCount: models.length, local: true };
+      return Array.isArray(body?.data) ? body.data : [];
     } catch (err) {
       if (err?.code) throw err;
       throw normalizedError({
@@ -136,6 +139,27 @@ export class LocalOpenAIAdapter {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Reachability and identity. `/v1/models` is a read-only listing, so it is
+   * a legitimate no-generation validation.
+   */
+  async validateCredential() {
+    const models = await this.#getModels();
+    return { ok: true, modelCount: models.length, local: true };
+  }
+
+  /**
+   * Model ids as the server reports them. Anything the server does not name is
+   * left to the user to type — the app never invents a model name.
+   */
+  async listModels() {
+    const raw = await this.#getModels();
+    return raw
+      .map((m) => (typeof m === "string" ? m : m?.id))
+      .filter((id) => typeof id === "string" && id.length > 0)
+      .map((id) => ({ id, source: "provider_list" }));
   }
 
   async listCapabilities() {

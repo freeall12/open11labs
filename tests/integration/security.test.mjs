@@ -321,8 +321,8 @@ describe("vault lifecycle", () => {
 
 describe("provider baseURL allowlist (SSRF)", () => {
   it("accepts registered provider hosts", () => {
-    expect(() => assertAllowedBaseURL("https://api.elevenlabs.io")).not.toThrow();
-    expect(() => assertAllowedBaseURL("https://api.eu.elevenlabs.io")).not.toThrow();
+    expect(() => assertAllowedBaseURL("https://api.elevenlabs.io", { type: "elevenlabs" })).not.toThrow();
+    expect(() => assertAllowedBaseURL("https://api.eu.elevenlabs.io", { type: "elevenlabs" })).not.toThrow();
   });
 
   it("rejects loopback, private ranges and link-local", () => {
@@ -334,17 +334,17 @@ describe("provider baseURL allowlist (SSRF)", () => {
       "http://169.254.169.254",
       "http://[::1]",
     ]) {
-      expect(() => assertAllowedBaseURL(host)).toThrow();
+      expect(() => assertAllowedBaseURL(host, { type: "elevenlabs" })).toThrow();
     }
   });
 
   it("rejects non-https and credential-bearing URLs", () => {
-    expect(() => assertAllowedBaseURL("http://api.elevenlabs.io")).toThrow(/https/);
-    expect(() => assertAllowedBaseURL("https://user:pw@api.elevenlabs.io")).toThrow(/credential/);
+    expect(() => assertAllowedBaseURL("http://api.elevenlabs.io", { type: "elevenlabs" })).toThrow(/https/);
+    expect(() => assertAllowedBaseURL("https://user:pw@api.elevenlabs.io", { type: "elevenlabs" })).toThrow(/credential/);
   });
 
   it("rejects an unregistered host even over https", () => {
-    expect(() => assertAllowedBaseURL("https://evil.example.com")).toThrow(/not registered/);
+    expect(() => assertAllowedBaseURL("https://evil.example.com", { type: "elevenlabs" })).toThrow(/not registered/);
   });
 });
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, cost, jobs, type CostSummary, type JobRecord } from "@/lib/api";
+import { labelForJobType } from "@/data/recents";
 
 /* ==========================================================================
    Task queue and cost ledger — local extension.
@@ -60,9 +61,18 @@ export function LocalJobsPageBody() {
   return (
     <div className="stack gap-8">
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+        <div className="stack items-start gap-2 rounded-xl border border-gray-alpha-200 p-4">
+          <p role="alert" className="text-sm text-red-700">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="focus-ring h-8 rounded-[10px] border border-gray-alpha-200 px-2.5 text-sm transition-colors hover:bg-gray-alpha-50"
+          >
+            重试
+          </button>
+        </div>
       )}
 
       <CostPanel summary={summary} budget={budget} scope={scope} onChanged={reload} />
@@ -108,7 +118,12 @@ function JobRow({ job, onChanged }: { job: JobRecord; onChanged: () => void }) {
     <div className="stack gap-2 rounded-xl border border-gray-alpha-150 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{job.type}</p>
+          <p className="truncate text-sm font-medium text-foreground">
+            {labelForJobType(job.type)}
+            <span className="ml-2 font-mono text-xs font-normal text-subtle">
+              {job.type}
+            </span>
+          </p>
           <p className="truncate font-mono text-xs text-subtle">{job.id}</p>
         </div>
         <span className={`shrink-0 text-xs font-medium ${STATUS_TONE[job.status] ?? "text-secondary"}`}>

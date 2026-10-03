@@ -34,6 +34,27 @@ let cost;
 
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0x10, 0x00, 0x00]);
 
+/**
+ * Minimal ISO-BMFF fixture. Audio and video share one container, so the only
+ * thing that separates them is the `hdlr` box's handler type.
+ */
+function isoBmff({ brand, handler }) {
+  const box = (type, payload) => {
+    const head = new Uint8Array(8);
+    new DataView(head.buffer).setUint32(0, 8 + payload.length);
+    head.set([...type].map((c) => c.charCodeAt(0)), 4);
+    return new Uint8Array([...head, ...payload]);
+  };
+  const ascii = (s) => [...s].map((c) => c.charCodeAt(0));
+  return new Uint8Array([
+    // ftyp, major brand + minor version + compatible brands
+    ...box("ftyp", new Uint8Array([...ascii(brand), 0, 0, 2, 0, ...ascii("isomiso2avc1mp41")])),
+    // moov > mdia > hdlr (version/flags, pre_defined, handler_type)
+    ...box("moov", box("mdia", box("hdlr", new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, ...ascii(handler), 0, 0, 0, 0])))),
+    ...box("mdat", new Uint8Array(64)),
+  ]);
+}
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "open11labs-store-"));
   db = openDb(join(dir, "meta.db"));
@@ -66,6 +87,42 @@ describe("asset store", () => {
     const serialised = JSON.stringify(asset);
     expect(serialised).not.toContain(dir);
     expect(serialised).not.toContain("/Volumes");
+  });
+
+  // Regression: an ISO-BMFF file was sniffed as `audio/mp4` purely because it
+  // had an `ftyp` box, so every real h264 upload was refused with
+  // "文件内容（audio/mp4）与声明的类型（video/mp4）不一致" — video could not be
+  // uploaded at all. The handler box decides; the brand is only a fallback.
+  it("types an mp4 container by its track handler, not by the ftyp box", async () => {
+    const { asset: video } = await assets.put({
+      bytes: isoBmff({ brand: "isom", handler: "vide" }),
+      displayName: "clip.mp4",
+      mediaType: "video/mp4",
+      origin: "uploaded",
+    });
+    expect(video.mediaType).toBe("video/mp4");
+
+    // The shared `isom` brand must not drag audio into video.
+    const { asset: audio } = await assets.put({
+      bytes: isoBmff({ brand: "M4A ", handler: "soun" }),
+      displayName: "track.m4a",
+      mediaType: "audio/mp4",
+      origin: "uploaded",
+    });
+    expect(audio.mediaType).toBe("audio/mp4");
+  });
+
+  it("still refuses a declared type that contradicts the bytes", async () => {
+    // The handler check must not turn into a blanket accept: a file that says
+    // `soun` while the caller claims `video/mp4` is still a mismatch.
+    await expect(
+      assets.put({
+        bytes: isoBmff({ brand: "isom", handler: "soun" }),
+        displayName: "liar.mp4",
+        mediaType: "video/mp4",
+        origin: "uploaded",
+      }),
+    ).rejects.toThrow(/不一致/);
   });
 
   it("writes the file to a server-generated location", async () => {

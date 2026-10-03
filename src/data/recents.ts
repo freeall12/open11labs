@@ -1,75 +1,91 @@
 import type { ComponentType, SVGProps } from "react";
 
 import {
-  IconSoundFx,
-  IconFlows,
   IconCaption,
+  IconImage,
+  IconMusic,
+  IconSoundFx,
+  IconStudio,
+  IconVideo,
   IconWaveform,
+  IconChat,
 } from "@/lib/icons";
 
 export type RecentIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 
-export interface RecentItem {
-  id: string;
-  title: string;
-  /** Product area shown in the second column. */
-  category: string;
-  /** Row thumbnail, taken from the real app icon set. */
-  icon: RecentIcon;
-  /** Pre-formatted relative time, matching the site's own formatter output. */
-  time: string;
-  href: string;
+/* ==========================================================================
+   Home "最近" row presentation.
+
+   The rows themselves are NOT defined here. They come from the local job
+   ledger at render time (`jobs.list()` in @/lib/api), because a hardcoded
+   array here would be invented projects with invented timestamps — exactly the
+   thing the fidelity rules forbid. This file only holds presentation:
+
+     - how a job `type` reads in Chinese
+     - which glyph stands for it
+     - how a real `createdAt` becomes a relative label
+
+   A type with no entry below falls back to its raw value and the generic
+   caption glyph, so a job kind added on the server later still renders
+   honestly instead of being mislabelled as something else.
+   ========================================================================== */
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  tts: "文本转语音",
+  stt: "语音转文本",
+  sts: "变声器",
+  isolation: "人声分离",
+  sfx: "音效",
+  image: "图像",
+  video: "视频",
+  chat: "对话",
+  music: "音乐",
+  dubbing: "配音",
+  audiobook: "有声书",
+  lipsync: "口型",
+};
+
+const JOB_TYPE_ICONS: Record<string, RecentIcon> = {
+  tts: IconWaveform,
+  stt: IconCaption,
+  sfx: IconSoundFx,
+  image: IconImage,
+  video: IconVideo,
+  music: IconMusic,
+  chat: IconChat,
+};
+
+export function labelForJobType(type: string): string {
+  return JOB_TYPE_LABELS[type] ?? type;
 }
 
-/* Placeholder rows. Wire this to your own project store later — the shape is
-   what the panel renders, so any source can fill it. */
-export const RECENT_ITEMS: RecentItem[] = [
-  {
-    id: "r1",
-    title: "雨夜街角的环境音",
-    category: "Sound Effects",
-    icon: IconSoundFx,
-    time: "上周",
-    href: "/app/sound-effects/history",
-  },
-  {
-    id: "r2",
-    title: "新品发布短片",
-    category: "Flows",
-    icon: IconFlows,
-    time: "上周",
-    href: "/app/flows",
-  },
-  {
-    id: "r3",
-    title: "未命名 Flow",
-    category: "Flows",
-    icon: IconFlows,
-    time: "上周",
-    href: "/app/flows",
-  },
-  {
-    id: "r4",
-    title: "木工刨削比赛，比谁刨的木片最薄。",
-    category: "Dubbing",
-    icon: IconCaption,
-    time: "上个月",
-    href: "/app/dubbing",
-  },
-  {
-    id: "r5",
-    title: "角色设定图",
-    category: "Flows",
-    icon: IconFlows,
-    time: "上个月",
-    href: "/app/flows",
-  },
-  {
-    id: "r6",
-    title: "晨间新闻播报",
-    category: "Text to Speech",
-    icon: IconWaveform,
-    time: "上个月",
-    href: "/app/speech-synthesis/text-to-speech",
-  },
-];
+export function iconForJobType(type: string): RecentIcon {
+  return JOB_TYPE_ICONS[type] ?? IconStudio;
+}
+
+/**
+ * Relative label computed from the record's own timestamp.
+ *
+ * Deliberately never returns "0" or an empty string for a missing or
+ * unparseable date — an unparseable timestamp reads "时间未知" rather than
+ * silently becoming "刚刚", which would be a fabricated fact.
+ */
+export function formatRelative(iso: string, now: number = Date.now()): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "时间未知";
+
+  const minutes = Math.round((now - then) / 60_000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} 天前`;
+
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months} 个月前`;
+
+  return `${Math.round(months / 12)} 年前`;
+}

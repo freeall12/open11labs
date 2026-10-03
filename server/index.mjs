@@ -30,6 +30,9 @@ import {
 import { Vault, toPublic } from "./lib/vault.mjs";
 import * as providers from "../packages/providers/elevenlabs/adapter.mjs";
 import { createLocalAdapter, PROVIDER_ID as LOCAL_PROVIDER_ID } from "../packages/providers/local/openai-compatible.mjs";
+import { createAnthropicAdapter } from "../packages/providers/anthropic/adapter.mjs";
+import { createGoogleAdapter } from "../packages/providers/google/adapter.mjs";
+import { publicProviders, providerById } from "../packages/providers/registry.mjs";
 import { openDb, getSetting, setSetting } from "./lib/db.mjs";
 import { JobStore } from "./lib/jobs.mjs";
 import { CostLedger } from "./lib/cost.mjs";
@@ -254,6 +257,44 @@ function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, d
       return json(res, ok ? 200 : 404, { removed: ok });
     }
 
+    // Model listing for a saved credential. A provider that does not publish a
+    // model list says so instead of the UI inventing a model name.
+    const providerModels = urlPath.match(/^\/api\/v1\/providers\/([^/]+)\/models$/);
+    if (providerModels && req.method === "GET") {
+      const id = providerModels[1];
+      if (!vault.get(id)) {
+        return json(res, 404, {
+          error: { code: "NOT_FOUND", safeMessage: "unknown provider" },
+        });
+      }
+      const adapter = adapterForCredential(id);
+      if (!adapter || typeof adapter.listModels !== "function") {
+        return json(res, 400, {
+          error: {
+            code: "CAPABILITY_UNAVAILABLE",
+            safeMessage: "该 Provider 不提供模型列表，请手动填写模型名",
+          },
+        });
+      }
+      try {
+        // The secret is read here, per call, exactly as the validation and
+        // voices routes do it. An adapter is not required to hold a key, and
+        // passing it here means one adapter implementation serves every
+        // platform instead of only the ones that bind the key at construction.
+        return json(res, 200, {
+          models: await adapter.listModels(vault.useSecret(id)),
+          source: "provider_list",
+        });
+      } catch (err) {
+        return json(res, 502, {
+          error: {
+            code: err?.code ?? "NETWORK_ERROR",
+            safeMessage: err?.safeMessage ?? "读取模型列表失败",
+          },
+        });
+      }
+    }
+
     if (urlPath.startsWith("/api/v1/providers/") && req.method === "GET") {
       const id = urlPath.split("/").pop();
       const rec = vault.get(id);
@@ -327,6 +368,13 @@ function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, d
       });
     }
 
+    /* -- provider catalogue ------------------------------------------- */
+    if (urlPath === "/api/v1/provider-catalog" && req.method === "GET") {
+      // Public metadata only: no host allowlist, no secret, no policy. The UI
+      // needs the label, the default URL and the key shape to render a form.
+      return json(res, 200, { providers: publicProviders() });
+    }
+
     /* -- voices ------------------------------------------------------- */
     if (urlPath === "/api/v1/voices" && req.method === "GET") {
       const ids = vault.list().map((p) => p.id);
@@ -370,14 +418,38 @@ function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, d
       const out = [];
       for (const id of ids) {
         const adapter = adapterForCredential(id);
-        if (!adapter) continue;
+        // One row shape for the whole endpoint. `providerId` is the PLATFORM
+        // id, matching what the adapters report; `credentialIds` carries the
+        // local credentials that resolve to it. Mixing a credential id into
+        // `providerId` made a client unable to tell the two apart, which is
+        // exactly the kind of ambiguity that turns into a wrong capability.
+        const rec = vault.get(id);
+        if (!rec) continue;
+        const platform = rec.type;
+        if (!adapter) {
+          out.push({
+            providerId: platform,
+            credentialIds: [id],
+            modelId: "unknown",
+            taskType: "chat",
+            availability: "unavailable",
+            reason: `该平台已登记但尚无适配器，无法查询能力`,
+          });
+          continue;
+        }
         try {
-          out.push(...(await adapter.listCapabilities(vault.useSecret(id))));
+          out.push(
+            ...(await adapter.listCapabilities(vault.useSecret(id))).map((row) => ({
+              ...row,
+              credentialIds: [id],
+            })),
+          );
         } catch {
           out.push({
-            providerId: id,
+            providerId: platform,
+            credentialIds: [id],
             modelId: "unknown",
-            taskType: "text_to_speech",
+            taskType: "chat",
             availability: "unverified",
             reason: "能力查询失败，未做猜测",
           });
@@ -715,6 +787,35 @@ function createApi({ vault, sessions, log, port, jobs, cost, assets, projects, d
 
 /* ------------------------------------------------------------- server -- */
 
+/**
+ * Adapter factories, keyed by the registry's own `adapter` field.
+ *
+ * The registry entry decides which wire shape a platform speaks, so the key
+ * here is a shape, not a vendor. Adding a platform is a registry edit plus one
+ * line here, and the resolver below stays free of platform knowledge.
+ *
+ * `key` is handed to the factory only for the adapters that bind it for their
+ * whole lifetime. The chat adapters take the key per request instead, so a
+ * long-lived adapter object never holds a secret.
+ */
+const ADAPTER_FACTORIES = {
+  elevenlabs: ({ baseURL }) => new providers.ElevenLabsAdapter({ baseURL }),
+  /** The hosted gateway and the user's own local server speak one shape. */
+  openai: ({ baseURL, key }) => createLocalAdapter({ baseURL, apiKey: key }),
+  "openai-compatible": ({ baseURL, key }) => createLocalAdapter({ baseURL, apiKey: key }),
+  anthropic: ({ baseURL }) => createAnthropicAdapter({ baseURL }),
+  google: ({ baseURL }) => createGoogleAdapter({ baseURL }),
+};
+
+/**
+ * Type ids that predate the registry. They name a wire shape rather than a
+ * platform, which is why they are not catalog entries: adding one would offer
+ * users a "platform" that cannot be configured.
+ */
+const LEGACY_TYPE_ADAPTERS = {
+  [LOCAL_PROVIDER_ID]: "openai-compatible",
+};
+
 export function createLocalServer({
   root,
   vault,
@@ -741,24 +842,29 @@ export function createLocalServer({
 
   /**
    * One place that maps a stored credential to the adapter that can talk to
-   * it. A new provider type is added here; no page ever imports an adapter.
+   * it. A new platform is added to the registry and to the factory table
+   * below; no page and no branch here ever names a platform id.
    *
-   * The local adapter is built per credential because its baseURL differs per
-   * machine, and its secret is read here rather than being held by a page.
+   * Adapters are built per credential because the base URL and the key differ
+   * per entry, and because the secret is read here rather than being held by a
+   * page.
    */
   const adapterForCredential = (credentialRef) => {
     if (providerAdapters[credentialRef]) return providerAdapters[credentialRef];
     const rec = vault.get(credentialRef);
     if (!rec) return null;
     if (providerAdapters[rec.type]) return providerAdapters[rec.type];
-    if (rec.type === LOCAL_PROVIDER_ID) {
-      return createLocalAdapter({
-        baseURL: rec.baseURL,
-        apiKey: vault.useSecret(rec.id),
-      });
-    }
-    if (rec.type === "elevenlabs") return providers.elevenlabs;
-    return null;
+
+    // The registry's own `adapter` field names the wire shape. Falling back to
+    // the legacy table covers records saved before the registry existed.
+    const kind =
+      providerById(rec.type)?.adapter ?? LEGACY_TYPE_ADAPTERS[rec.type] ?? null;
+    const factory = kind ? ADAPTER_FACTORIES[kind] : null;
+
+    // A registered platform with no adapter built yet is reported as such by
+    // the capability endpoint rather than being silently routed elsewhere.
+    if (!factory) return null;
+    return factory({ baseURL: rec.baseURL, key: vault.useSecret(rec.id) });
   };
 
   const runner = new JobRunner({ jobs, assets, cost, vault, adapters: {} });

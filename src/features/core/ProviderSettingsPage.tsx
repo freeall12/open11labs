@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, providers, type ProviderRecord } from "@/lib/api";
+import {
+  ApiError,
+  providers as providersApi,
+  type ProviderRecord,
+  type ProviderSpec,
+} from "@/lib/api";
 
 /* ==========================================================================
    Provider and key settings — local extension, not an upstream replica.
@@ -40,7 +45,7 @@ export function ProviderSettingsPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await providers.list());
+      setItems(await providersApi.list());
       setLoadError(null);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "无法读取本地密钥");
@@ -66,7 +71,20 @@ export function ProviderSettingsPage() {
         <h2 className="text-sm font-medium text-foreground">已保存的密钥</h2>
 
         {loading && <p className="text-sm text-secondary">读取中…</p>}
-        {loadError && <ErrorNote text={loadError} />}
+        {loadError && (
+          <div className="stack items-start gap-2 rounded-xl border border-gray-alpha-200 p-4">
+            <ErrorNote text={loadError} />
+            {/* A failure with no way back is a dead end; the reload path is the
+                one control that has to be present in the error state itself. */}
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="focus-ring h-8 rounded-[10px] border border-gray-alpha-200 px-2.5 text-sm transition-colors hover:bg-gray-alpha-50"
+            >
+              重试
+            </button>
+          </div>
+        )}
 
         {!loading && !loadError && items.length === 0 && (
           <EmptyState />
@@ -88,29 +106,117 @@ export function ProviderSettingsPage() {
 
 /* ------------------------------------------------------------------ add -- */
 
+/**
+ * The platform list comes from the server registry rather than a copy here.
+ * A hardcoded table would drift from what the server actually accepts, and
+ * the failure would only show up at save time.
+ */
+const TASK_LABELS: Record<string, string> = {
+  tts: "文本转语音",
+  stt: "语音转文本",
+  sts: "变声",
+  isolation: "人声分离",
+  sfx: "音效",
+  image: "图像",
+  video: "视频",
+  chat: "对话",
+};
+
 function AddProvider({ onAdded }: { onAdded: () => void }) {
+  const [specs, setSpecs] = useState<ProviderSpec[]>([]);
+  const [kindId, setKindId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [baseURL, setBaseURL] = useState("https://api.elevenlabs.io");
+  const [baseURL, setBaseURL] = useState("");
   const [secret, setSecret] = useState("");
+  const [selfHosted, setSelfHosted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  /* Catalog and submit fail for different reasons and are recoverable in
+     different ways, so they cannot share one message slot. */
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  /**
+   * The platform catalog is a second, independent request from the saved-key
+   * list above. Retrying only the list left this form permanently dead — no
+   * chips, a disabled submit, and nothing to press — so it needs its own
+   * loading flag and its own retry.
+   */
+  const loadCatalog = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await providersApi.catalog();
+      setSpecs(list);
+      setCatalogError(null);
+      setKindId((current) => {
+        // Keep the current choice across a retry when it survived, otherwise
+        // fall back to the first platform.
+        if (current && list.some((k) => k.id === current)) return current;
+        return list[0]?.id ?? "";
+      });
+    } catch (err) {
+      setCatalogError(err instanceof ApiError ? err.message : "无法读取可用平台列表");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  const kind = specs.find((k) => k.id === kindId) ?? null;
+
+  // A retry that lands on a different platform must not leave the old platform's
+  // base URL behind, or the form would submit an address the server rejects.
+  useEffect(() => {
+    if (!kind) return;
+    setBaseURL((current) =>
+      current === "" || specs.some((k) => k.defaultBaseURL === current)
+        ? kind.defaultBaseURL
+        : current,
+    );
+  }, [kind, specs]);
+
+  function pickKind(id: string) {
+    const next = specs.find((k) => k.id === id);
+    setKindId(id);
+    setBaseURL(next?.defaultBaseURL ?? "");
+    setSecret("");
+    setSelfHosted(next?.requiresSelfHosted === true);
+    setCatalogError(null);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setSubmitError(null);
+    if (!kind) {
+      setSubmitError("请先选择平台");
+      return;
+    }
     if (!secret) {
-      setError("请输入 API 密钥");
+      setSubmitError("请输入 API 密钥");
+      return;
+    }
+    if (kind.requiresSelfHosted && !selfHosted) {
+      setSubmitError("该平台需要显式确认自托管");
       return;
     }
     setBusy(true);
     try {
-      await providers.add({ type: "elevenlabs", displayName, baseURL, secret });
+      await providersApi.add({
+        type: kind.id,
+        displayName,
+        baseURL,
+        secret,
+        selfHosted: selfHosted && kind.requiresSelfHosted,
+      });
       // Clear the field immediately: the key must not linger in the DOM.
       setSecret("");
       setDisplayName("");
       onAdded();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "保存失败");
+      setSubmitError(err instanceof ApiError ? err.message : "保存失败");
     } finally {
       setBusy(false);
     }
@@ -118,27 +224,89 @@ function AddProvider({ onAdded }: { onAdded: () => void }) {
 
   return (
     <form onSubmit={submit} className="stack gap-3 rounded-xl border border-gray-alpha-150 p-5">
-      <h2 className="text-sm font-medium text-foreground">添加密钥</h2>
+      <h2 className="text-sm font-medium text-foreground">添加 Provider</h2>
+
+      {loading && <p className="text-sm text-secondary">读取可用平台列表…</p>}
+
+      {/* Catalog failure is its own dead end, separate from the saved-key list
+          above, so it carries its own retry. */}
+      {!loading && specs.length === 0 && (
+        <div className="stack items-start gap-2">
+          <ErrorNote text={catalogError ?? "可用平台列表为空"} />
+          <button
+            type="button"
+            onClick={() => void loadCatalog()}
+            className="focus-ring h-8 rounded-[10px] border border-gray-alpha-200 px-2.5 text-sm transition-colors hover:bg-gray-alpha-50"
+          >
+            重试
+          </button>
+        </div>
+      )}
+
+      {specs.length > 0 && (
+        <fieldset className="stack gap-2">
+          <legend className="text-sm text-secondary">平台</legend>
+          <div className="flex flex-wrap gap-2">
+            {specs.map((k) => (
+              <label
+                key={k.id}
+                className={`focus-ring cursor-pointer rounded-[10px] border px-2.5 py-1.5 text-sm transition-colors ${
+                  kindId === k.id
+                    ? "border-foreground bg-gray-alpha-100 text-foreground"
+                    : "border-gray-alpha-200 text-secondary hover:bg-gray-alpha-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="provider-kind"
+                  value={k.id}
+                  checked={kindId === k.id}
+                  onChange={() => pickKind(k.id)}
+                  className="sr-only"
+                />
+                {k.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      {kind && (
+        <p className="text-xs text-subtle">
+          该平台已接入：
+          {kind.taskTypes.map((t) => TASK_LABELS[t] ?? t).join("、") || "（尚无）"}。
+          {kind.chat ? "可用于多轮创作对话。" : "不提供对话接口。"}
+          {kind.docs && (
+            <>
+              {" "}
+              <a href={kind.docs} target="_blank" rel="noreferrer" className="underline">
+                官方文档
+              </a>
+            </>
+          )}
+        </p>
+      )}
 
       <label className="stack gap-1.5 text-sm">
         <span className="text-secondary">显示名称</span>
         <input
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="例如：我的 ElevenLabs"
-          className="focus-ring h-9 rounded-lg border border-gray-alpha-150 bg-background px-3 text-sm outline-none placeholder:text-subtle"
+          placeholder={kind?.label ?? "我的 Provider"}
+          className="focus-ring h-9 w-full rounded-lg border border-gray-alpha-150 bg-background px-3 text-sm outline-none placeholder:text-subtle"
         />
       </label>
 
       <label className="stack gap-1.5 text-sm">
-        <span className="text-secondary">Provider 地址</span>
+        <span className="text-secondary">Base URL</span>
         <input
           value={baseURL}
           onChange={(e) => setBaseURL(e.target.value)}
-          className="focus-ring h-9 rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none"
+          placeholder={kind?.defaultBaseURL}
+          className="focus-ring h-9 w-full rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none placeholder:text-subtle"
         />
         <span className="text-xs text-subtle">
-          仅允许已登记的官方地址；自托管地址需在服务端显式登记。
+          只接受该平台登记的域名。自托管地址需勾选下方选项。
         </span>
       </label>
 
@@ -146,31 +314,41 @@ function AddProvider({ onAdded }: { onAdded: () => void }) {
         <span className="text-secondary">API 密钥</span>
         <input
           type="password"
+          autoComplete="off"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          autoComplete="off"
-          spellCheck={false}
-          className="focus-ring h-9 rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none"
+          placeholder={kind?.keyPlaceholder ?? "sk-…"}
+          className="focus-ring h-9 w-full rounded-lg border border-gray-alpha-150 bg-background px-3 font-mono text-xs outline-none placeholder:text-subtle"
         />
-        <span className="text-xs text-subtle">
-          只写入本机服务端，保存后无法再读回。
-        </span>
+        <span className="text-xs text-subtle">只写入本机服务端，保存后无法再读回。</span>
       </label>
 
-      {error && <ErrorNote text={error} />}
+      {kind?.requiresSelfHosted && (
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={selfHosted}
+            onChange={(e) => setSelfHosted(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-secondary">
+            这是我自己部署的服务（自托管）。未勾选时该平台地址会被拒绝。
+          </span>
+        </label>
+      )}
+
+      {submitError && <ErrorNote text={submitError} />}
 
       <button
         type="submit"
-        disabled={busy}
-        className="focus-ring h-9 rounded-[10px] bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-gray-800 disabled:bg-gray-400"
+        disabled={busy || !kind || !secret}
+        className="focus-ring h-9 w-fit rounded-[10px] bg-foreground px-4 text-sm font-medium text-background hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
-        {busy ? "保存中…" : "保存并写入服务端"}
+        {busy ? "保存中…" : "保存密钥"}
       </button>
     </form>
   );
 }
-
-/* ------------------------------------------------------------------ row -- */
 
 function ProviderRow({
   provider,
@@ -209,6 +387,14 @@ function ProviderRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">
             {provider.displayName}
+            <span className="ml-2 font-mono text-xs font-normal text-subtle">
+              {provider.type}
+            </span>
+            {provider.selfHosted && (
+              <span className="ml-2 rounded bg-gray-alpha-100 px-1.5 py-0.5 text-xs text-secondary">
+                自托管
+              </span>
+            )}
           </p>
           <p className="truncate font-mono text-xs text-subtle">{provider.maskedSecret}</p>
         </div>
@@ -225,7 +411,7 @@ function ProviderRow({
         <button
           type="button"
           disabled={busy}
-          onClick={() => run(() => providers.validate(provider.id))}
+          onClick={() => run(() => providersApi.validate(provider.id))}
           className="focus-ring h-8 rounded-[10px] border border-gray-alpha-200 bg-background px-2.5 text-sm transition-colors hover:bg-gray-alpha-50 disabled:opacity-50"
         >
           {busy ? "验证中…" : "验证连接"}
@@ -245,7 +431,7 @@ function ProviderRow({
           disabled={busy}
           onClick={() =>
             confirming
-              ? run(() => providers.remove(provider.id))
+              ? run(() => providersApi.remove(provider.id))
               : setConfirming(true)
           }
           className="focus-ring h-8 rounded-[10px] px-2.5 text-sm text-red-700 transition-colors hover:bg-red-50"
@@ -272,7 +458,7 @@ function ProviderRow({
         <button
           type="button"
           disabled={busy || !rotateTo}
-          onClick={() => run(() => providers.rotate(provider.id, rotateTo))}
+          onClick={() => run(() => providersApi.rotate(provider.id, rotateTo))}
           className="focus-ring h-8 rounded-[10px] bg-foreground px-2.5 text-sm text-background disabled:bg-gray-400"
         >
           写入新密钥

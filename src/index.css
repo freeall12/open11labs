@@ -14,34 +14,35 @@
 
 @theme {
   /* Grey ramp (HSL channels) */
-  --color-gray-50: 0 0% 98%;
-  --color-gray-75: 0 0% 93%;
-  --color-gray-100: 0 0% 89%;
-  --color-gray-150: 0 0% 85%;
-  --color-gray-200: 0 0% 81%;
-  --color-gray-250: 0 0% 76%;
-  --color-gray-300: 0 0% 72%;
-  --color-gray-350: 0 0% 68%;
-  --color-gray-400: 0 0% 64%;
-  --color-gray-450: 0 0% 59%;
-  --color-gray-500: 0 0% 55%;
-  --color-gray-550: 0 0% 50%;
-  --color-gray-600: 0 0% 46%;
-  --color-gray-650: 0 0% 41%;
-  --color-gray-700: 0 0% 36%;
-  --color-gray-750: 0 0% 32%;
-  --color-gray-800: 0 0% 27%;
-  --color-gray-850: 0 0% 23%;
-  --color-gray-900: 0 0% 18%;
-  --color-gray-925: 0 0% 13%;
-  --color-gray-950: 0 0% 9%;
+  --color-gray-50: hsl(0 0% 98%);
+  --color-gray-75: hsl(0 0% 93%);
+  --color-gray-100: hsl(0 0% 89%);
+  --color-gray-150: hsl(0 0% 85%);
+  --color-gray-200: hsl(0 0% 81%);
+  --color-gray-250: hsl(0 0% 76%);
+  --color-gray-300: hsl(0 0% 72%);
+  --color-gray-350: hsl(0 0% 68%);
+  --color-gray-400: hsl(0 0% 64%);
+  --color-gray-450: hsl(0 0% 59%);
+  --color-gray-500: hsl(0 0% 55%);
+  --color-gray-550: hsl(0 0% 50%);
+  --color-gray-600: hsl(0 0% 46%);
+  --color-gray-650: hsl(0 0% 41%);
+  --color-gray-700: hsl(0 0% 36%);
+  --color-gray-750: hsl(0 0% 32%);
+  --color-gray-800: hsl(0 0% 27%);
+  --color-gray-850: hsl(0 0% 23%);
+  --color-gray-900: hsl(0 0% 18%);
+  --color-gray-925: hsl(0 0% 13%);
+  --color-gray-950: hsl(0 0% 9%);
 
   /* Typography */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  /* Waldenburg is ElevenLabs' proprietary display face. Real files are
-     downloaded to /public/fonts — see fonts.css. */
-  --font-waldenburg: "Waldenburg", ui-sans-serif, system-ui, sans-serif;
+  /* The display token keeps its historical name so no component changes.
+     The face behind it is now the OFL-licensed Outfit, not the proprietary
+     Waldenburg — see src/fonts.css for the recorded glyph deviation. */
+  --font-waldenburg: "Waldenburg", "Outfit", ui-sans-serif, system-ui, sans-serif;
 
   /* Radii */
   --radius-sm: 0.125rem;
@@ -108,20 +109,20 @@
 /* ---------- Light theme (default) ---------- */
 
 :root {
-  --background: 0 0% 100%;
-  --background-alt: 0 0% 99%;
-  --foreground: 240 3% 6%;
+  --background: hsl(0 0% 100%);
+  --background-alt: hsl(0 0% 99%);
+  --foreground: hsl(240 3% 6%);
 
   --primary: var(--gray-900);
-  --primary-foreground: 210 20% 98%;
+  --primary-foreground: hsl(210 20% 98%);
   --secondary: var(--darken-500);
   --subtle: var(--darken-450);
   --muted: var(--darken-100);
   --accent: var(--gray-100);
   --accent-foreground: var(--gray-900);
   --border: var(--gray-alpha-150);
-  --input: 220 13% 91%;
-  --ring: 224 71.4% 4.1%;
+  --input: hsl(220 13% 91%);
+  --ring: hsl(224 71.4% 4.1%);
   --card: var(--background);
   --popover: var(--background);
 
@@ -179,18 +180,18 @@
 /* ---------- Dark theme ---------- */
 
 .dark {
-  --background: 240 3% 6%;
-  --foreground: 0 0% 100%;
+  --background: hsl(240 3% 6%);
+  --foreground: hsl(0 0% 100%);
 
-  --primary: 210 20% 98%;
+  --primary: hsl(210 20% 98%);
   --secondary: var(--lighten-600);
   --subtle: var(--lighten-500);
   --muted: var(--lighten-100);
-  --accent: 215 27.9% 16.9%;
-  --accent-foreground: 210 20% 98%;
+  --accent: hsl(215 27.9% 16.9%);
+  --accent-foreground: hsl(210 20% 98%);
   --border: var(--gray-alpha-150);
-  --input: 215 27.9% 16.9%;
-  --ring: 216 12.2% 83.9%;
+  --input: hsl(215 27.9% 16.9%);
+  --ring: hsl(216 12.2% 83.9%);
   --card: var(--popover);
   --popover: var(--tw-gray-900);
 
@@ -241,7 +242,7 @@
 }
 
 :root {
-  --tw-gray-900: 0 0% 18%;
+  --tw-gray-900: hsl(0 0% 18%);
 }
 
 /* ---------- Layout offsets ----------
@@ -295,15 +296,15 @@
     flex-direction: column;
     min-height: 100dvh;
     position: relative;
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
   }
 
   ::selection {
-    background-color: hsl(var(--foreground) / 0.14);
+    background-color: color-mix(in oklab, var(--foreground) 14%, transparent);
   }
 }
 
@@ -333,7 +334,7 @@
 
 @utility scroll-subtle {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--gray-300)) transparent;
+  scrollbar-color: var(--gray-300) transparent;
   overflow: auto;
 }
 
@@ -346,7 +347,7 @@
       ) var(--tw-ring-color, currentcolor);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
       var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    --tw-ring-offset-color: var(--background-color, hsl(var(--background)));
+    --tw-ring-offset-color: var(--background-color, var(--background));
     --tw-outline-style: none;
     outline-style: none;
   }

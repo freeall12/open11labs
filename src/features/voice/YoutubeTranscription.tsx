@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Notice } from "@/features/voice/ui";
 import { Link } from "react-router-dom";
 import {
   ApiError,
@@ -36,7 +37,27 @@ const EXAMPLES = [
   "https://youtu.be/…",
 ];
 
-export function YoutubeTranscription() {
+/**
+ * @param compact Rendered inside the transcribe dialog: the surrounding dialog
+ * already supplies the title, tabs and footer, so the panel drops its own
+ * heading and closing button and keeps only the source, the gates and the
+ * result.
+ */
+export interface YoutubeControls {
+  run: () => void;
+  disabled: boolean;
+  busy: boolean;
+  label: string;
+}
+
+export function YoutubeTranscription({
+  compact = false,
+  onControls,
+}: {
+  compact?: boolean;
+  /** In compact mode the host owns the submit button, so it needs the action. */
+  onControls?: (c: YoutubeControls) => void;
+} = {}) {
   const [url, setUrl] = useState("");
   const [language, setLanguage] = useState("auto");
   const [ackCost, setAckCost] = useState(false);
@@ -80,6 +101,17 @@ export function YoutubeTranscription() {
     if (!url.trim()) return "请粘贴 YouTube 链接";
     return null;
   }, [loading, ytdlp, provider, url]);
+
+  // The host renders the submit button, so the gate result travels with it
+  // instead of being duplicated — one source of truth for "can I submit".
+  useEffect(() => {
+    onControls?.({
+      run: () => void run(),
+      disabled: !!blocked || busy || !ackCost || !ackRights,
+      busy,
+      label: busy ? "下载并转写中…" : "下载并转写",
+    });
+  });
 
   async function run() {
     if (!provider) return;
@@ -130,10 +162,12 @@ export function YoutubeTranscription() {
         </Notice>
       )}
 
-      <Notice tone="info">
-        流程：<strong>yt-dlp（开源）</strong>下载公开视频的音轨 → 存入本机素材库 →
-        用**你自己的** STT Provider 转写。全程不经过任何第三方转写服务。
-      </Notice>
+      {!compact && (
+        <Notice tone="info">
+          流程：<strong>yt-dlp（开源）</strong>下载公开视频的音轨 → 存入本机素材库 →
+          用**你自己的** STT Provider 转写。全程不经过任何第三方转写服务。
+        </Notice>
+      )}
 
       <section className="stack gap-3">
         <label className="stack gap-1.5 text-sm">
@@ -202,14 +236,16 @@ export function YoutubeTranscription() {
       {note && <Notice tone="error">{note}</Notice>}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          disabled={!!blocked || busy || !ackCost || !ackRights}
-          onClick={run}
-          className="focus-ring h-9 rounded-[10px] bg-foreground px-4 text-sm font-medium text-background hover:bg-gray-800 disabled:bg-gray-400"
-        >
-          {busy ? "下载并转写中…" : "下载并转写"}
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            disabled={!!blocked || busy || !ackCost || !ackRights}
+            onClick={run}
+            className="focus-ring h-9 rounded-[10px] bg-foreground px-4 text-sm font-medium text-background hover:bg-gray-800 disabled:bg-gray-400"
+          >
+            {busy ? "下载并转写中…" : "下载并转写"}
+          </button>
+        )}
         {blocked && <span className="text-xs text-secondary">{blocked}</span>}
       </div>
 
@@ -245,7 +281,7 @@ export function YoutubeTranscription() {
             className="focus-ring w-full resize-y rounded-lg border border-gray-alpha-150 bg-background p-3 font-mono text-xs outline-none"
           />
           <p className="text-xs text-subtle">
-            编辑这里的文字**不会**重新调用转写；如需重转请重新提交任务（会产生新费用）。
+            编辑这里的文字<strong>不会</strong>重新调用转写；如需重转请重新提交任务（会产生新费用）。
           </p>
         </section>
       )}
@@ -264,19 +300,4 @@ async function toolsApi(): Promise<ToolStatus[]> {
   const res = await fetch("/api/v1/tools");
   const body = await res.json();
   return body.tools ?? [];
-}
-
-function Notice({
-  tone,
-  children,
-}: {
-  tone: "error" | "warn" | "info";
-  children: React.ReactNode;
-}) {
-  const cls = {
-    error: "bg-red-50 text-red-700",
-    warn: "bg-amber-50 text-amber-800",
-    info: "bg-gray-alpha-50 text-secondary",
-  }[tone];
-  return <div className={`rounded-lg px-3 py-2 text-sm ${cls}`}>{children}</div>;
 }

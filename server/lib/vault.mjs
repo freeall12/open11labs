@@ -13,6 +13,7 @@
    the user choosing to persist it is the case worth avoiding.
    ========================================================================== */
 
+import { allowedHostsFor, requiresSelfHosted } from "../../packages/providers/registry.mjs";
 import {
   createCipheriv,
   createDecipheriv,
@@ -98,7 +99,7 @@ export class Vault {
     // allowlist, and it has to be opted into explicitly. It is recorded on
     // the credential so the UI can label it and the runner can hold it to a
     // loopback-or-declared-host rule.
-    assertAllowedBaseURL(baseURL, { allowPrivate: selfHosted === true });
+    assertAllowedBaseURL(baseURL, { type, allowPrivate: selfHosted === true });
 
     const id = nextId();
     const rec = {
@@ -237,19 +238,18 @@ export class Vault {
 
 /* ------------------------------------------------------------ base URL -- */
 
-const DEFAULT_PROVIDER_HOSTS = {
-  elevenlabs: ["api.elevenlabs.io", "api.eu.elevenlabs.io"],
-  // OpenAI-compatible local servers. Only reachable when the credential is
-  // explicitly registered as self-hosted.
-  "openai-local": ["127.0.0.1", "localhost", "[::1]"],
-};
-
 /**
- * Only registered provider hosts are allowed. This is what stops a user (or
- * a malicious page that somehow reaches this API) from pointing the server at
- * a private address and having it fetch with the user's key.
+ * Validate a provider base URL against that provider's registered hosts.
+ *
+ * `type` selects the allowlist. A provider with an empty list (self-hosted)
+ * is only reachable when the user marked the credential self-hosted, and even
+ * then only over https or on loopback — a self-hosted entry must not become a
+ * way to send a key in clear text to an arbitrary public host.
+ *
+ * @param {string} raw
+ * @param {{ type?: string, allowPrivate?: boolean }} [options]
  */
-export function assertAllowedBaseURL(raw, { allowPrivate = false } = {}) {
+export function assertAllowedBaseURL(raw, { type, allowPrivate = false } = {}) {
   let url;
   try {
     url = new URL(raw);
@@ -265,37 +265,52 @@ export function assertAllowedBaseURL(raw, { allowPrivate = false } = {}) {
   const isLoopback =
     host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
 
-  // A registered self-hosted provider may be a plain-http dev server on
-  // loopback, because that traffic never leaves the machine. It may NOT be a
-  // public host over http, where the credential would travel in clear.
-  if (url.protocol === "http:") {
-    if (allowPrivate && isLoopback) return url;
+  if (allowPrivate) {
+    // A registered self-hosted provider may serve plain http on loopback,
+    // because that traffic never leaves the machine. A public host over http
+    // is refused even when self-hosted: the credential would travel in clear.
+    if (url.protocol === "http:" && isLoopback) return url;
+    if (url.protocol === "https:") {
+      const p = host.split(".").map(Number);
+      const looksPrivate =
+        isLoopback ||
+        (p.length === 4 && (p[0] === 10 || p[0] === 192 || (p[0] === 172 && p[1] >= 16)));
+      if (looksPrivate) return url;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new TypeError(`provider baseURL protocol not allowed: ${url.protocol}`);
+    }
+  }
+
+  if (url.protocol !== "https:") {
     throw new TypeError(
       isLoopback
         ? "本机地址需要显式标记为自托管 Provider 才允许使用"
         : "provider baseURL must be https",
     );
   }
-  if (url.protocol !== "https:") {
-    throw new TypeError("provider baseURL must be https");
-  }
 
-  if (allowPrivate) {
-    // Private ranges are only reachable for an explicitly self-hosted entry.
-    const p = host.split(".").map(Number);
-    const looksPrivate =
-      isLoopback ||
-      (p.length === 4 && (p[0] === 10 || p[0] === 192 || (p[0] === 172 && p[1] >= 16)));
-    if (looksPrivate) return url;
-  }
-
-  const allowed = DEFAULT_PROVIDER_HOSTS.elevenlabs;
-  if (!allowed.includes(host)) {
+  const allowed = allowedHostsFor(type);
+  if (allowed.length === 0) {
+    // A self-hosted provider has no registered host list by design. The host
+    // still has to be one the user declared, so name the host in the error.
     throw new TypeError(
-      `provider host not registered: ${host}. Self-hosted providers must be registered explicitly.`,
+      `provider host not registered for type "${type ?? "unknown"}": ${host}. ` +
+        "A self-hosted provider must be on loopback or a private range, or its host must be registered.",
     );
   }
+  if (!allowed.includes(host)) {
+    throw new TypeError(`provider host not registered for ${type}: ${host}`);
+  }
   return url;
+}
+
+/**
+ * Whether a credential of this type must be self-hosted. Surfaced to the UI
+ * so the form can require the checkbox instead of failing at save time.
+ */
+export function selfHostedRequired(type) {
+  return requiresSelfHosted(type);
 }
 
 export { timingSafeEqual };

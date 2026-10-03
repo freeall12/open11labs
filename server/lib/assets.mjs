@@ -338,6 +338,51 @@ function sniffType(name) {
  * Read the real container from the file's magic bytes. Returns null when the
  * header is not recognised, so the caller can fall back to the extension.
  */
+/**
+ * ISO-BMFF (mp4/m4a/3gp) is one container for both audio and video, so the
+ * `ftyp` box alone cannot say which. Reading it as "audio/mp4" made every real
+ * h264 upload fail the declared-type check below with
+ * "文件内容（audio/mp4）与声明的类型（video/mp4）不一致" — video could not be
+ * uploaded at all.
+ *
+ * Two signals, in order of trust:
+ *   1. the `hdlr` box, which names the handler type (`vide` / `soun`). This is
+ *      ground truth and is what the decision uses.
+ *   2. the major brand, only as a fallback when no handler is present in the
+ *      scanned window (a truncated or metadata-only file).
+ *
+ * @param {Uint8Array} bytes
+ * @returns {"video/mp4"|"audio/mp4"}
+ */
+function sniffIsoBmff(bytes) {
+  // The handler box normally sits in the first few KB (moov). Scan far enough
+  // to cover a typical file layout without walking the whole thing.
+  const limit = Math.min(bytes.length, 512 * 1024);
+  const hay = latin1(bytes.subarray(0, limit));
+  for (let i = 0; i + 12 < limit; i += 1) {
+    if (hay.substr(i, 4) !== "hdlr") continue;
+    // hdlr payload: version+flags (4) pre_defined (4) handler_type (4)
+    const handler = hay.substr(i + 12, 4);
+    if (handler === "vide") return "video/mp4";
+    if (handler === "soun") return "audio/mp4";
+  }
+  // No handler found. Fall back to the major brand: the audio-only brands are
+  // distinct; the shared ones (isom, mp42, ...) lean video because that is the
+  // far more common case for a user uploading a file.
+  const brand = String.fromCharCode(...bytes.subarray(8, 12));
+  if (brand === "M4A " || brand === "M4B ") return "audio/mp4";
+  return "video/mp4";
+}
+
+function latin1(bytes) {
+  let out = "";
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    out += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return out;
+}
+
 function sniffContainer(bytes) {
   if (!bytes || bytes.byteLength < 12) return null;
   const tag = (o, n) => String.fromCharCode(...bytes.subarray(o, o + n));
@@ -346,7 +391,7 @@ function sniffContainer(bytes) {
   if (tag(0, 4) === "OggS") return "audio/ogg";
   if (tag(0, 3) === "ID3") return "audio/mpeg";
   if (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0) return "audio/mpeg";
-  if (tag(4, 4) === "ftyp") return "audio/mp4";
+  if (tag(4, 4) === "ftyp") return sniffIsoBmff(bytes);
   if (bytes[0] === 0x89 && tag(1, 3) === "PNG") return "image/png";
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
   if (tag(0, 4) === "RIFF" && tag(8, 4) === "WEBP") return "image/webp";

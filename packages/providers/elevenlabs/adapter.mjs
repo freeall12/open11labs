@@ -21,6 +21,7 @@ import {
   usageEntry,
   ERROR_CODES,
 } from "../../contracts/src/index.mjs";
+import { redact } from "../lib/transport.mjs";
 
 export const PROVIDER_ID = "elevenlabs";
 
@@ -98,7 +99,7 @@ export class ElevenLabsAdapter {
     }
 
     if (!res.ok) {
-      throw await this.#normalizeHttpError(res);
+      throw await this.#normalizeHttpError(res, key);
     }
 
     if (expect === "binary") {
@@ -116,11 +117,13 @@ export class ElevenLabsAdapter {
     };
   }
 
-  async #normalizeHttpError(res) {
+  async #normalizeHttpError(res, key) {
     const requestId = res.headers.get("request-id");
 
     // Read a small amount of body for field errors, then discard it: the
-    // safeMessage below never contains the raw payload.
+    // safeMessage below never contains the raw payload. It is redacted against
+    // the live key too, because an upstream error body is the one place a
+    // provider could echo the credential back at us.
     let detail = null;
     try {
       const text = await res.text();
@@ -129,10 +132,11 @@ export class ElevenLabsAdapter {
       /* body is optional */
     }
 
-    const message =
+    const rawMessage =
       (detail && (detail.detail?.message || detail.detail || detail.message)) ||
       res.statusText ||
-    `HTTP ${res.status}`;
+      `HTTP ${res.status}`;
+    const message = redact(rawMessage, key, 200);
 
     if (res.status === 401 || res.status === 403) {
       return normalizedError({
@@ -161,7 +165,7 @@ export class ElevenLabsAdapter {
     if (res.status === 422 || res.status === 400) {
       return normalizedError({
         code: "VALIDATION_ERROR",
-        safeMessage: `请求参数不被接受：${String(message).slice(0, 200)}`,
+        safeMessage: `请求参数不被接受：${message}`,
         retryable: false,
         submissionCertainty: "not_submitted",
         providerRequestId: requestId,
@@ -371,11 +375,31 @@ export class ElevenLabsAdapter {
    * has been seen. An unrecognised status becomes `unknown` rather than
    * `completed`, so a typo cannot be read as a finished job.
    */
-  async submitAsync({ key, prompt, modelId, imageUrl, durationSeconds }) {
+  async submitAsync({
+    key,
+    prompt,
+    modelId,
+    imageUrl,
+    durationSeconds,
+    aspectRatio,
+    resolution,
+    sound,
+    loop,
+  }) {
     const payload = { prompt };
     if (modelId) payload.model_id = modelId;
     if (imageUrl) payload.image_url = imageUrl;
     if (typeof durationSeconds === "number") payload.duration_seconds = durationSeconds;
+    // These three are sent only when the caller actually set them. The UI has
+    // exposed 比例 / 分辨率 / 声音 controls, and dropping them on the floor made
+    // those controls cosmetic. Whether the *upstream endpoint* honours them is
+    // still unverified, so they are forwarded verbatim and never defaulted —
+    // inventing a value here would make the control look real while changing
+    // the output.
+    if (aspectRatio) payload.aspect_ratio = aspectRatio;
+    if (resolution) payload.resolution = resolution;
+    if (typeof sound === "boolean") payload.generate_audio = sound;
+    if (typeof loop === "boolean") payload.loop = loop;
 
     const { data, requestId } = await this.#request({
       method: "POST",
@@ -781,6 +805,20 @@ export class ElevenLabsAdapter {
       bytes: new Uint8Array(await res.arrayBuffer()),
       contentType: res.headers.get("content-type") ?? "application/octet-stream",
     };
+  }
+
+  /**
+   * Chat is not a capability of this provider. Saying so explicitly beats
+   * letting a caller discover it as a confusing 404 later.
+   */
+  async submitChat() {
+    throw normalizedError({
+      code: "CAPABILITY_UNAVAILABLE",
+      safeMessage:
+        "ElevenLabs 不提供对话补全；请在本地设置中配置一个 OpenAI 兼容的本地或第三方 LLM Provider",
+      retryable: false,
+      submissionCertainty: "not_submitted",
+    });
   }
 
   /** Synchronous TTS has nothing to poll. */

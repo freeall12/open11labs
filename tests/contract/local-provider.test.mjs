@@ -198,3 +198,54 @@ describe("local adapter", () => {
     });
   });
 });
+
+/* --------------------------------------------------------------- models -- */
+
+describe("model listing", () => {
+  it("returns exactly the ids the server published", async () => {
+    const impl = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: "qwen2.5" }, { id: "phi4" }] }));
+    await expect(adapterWith(impl).listModels()).resolves.toEqual([
+      { id: "qwen2.5", source: "provider_list" },
+      { id: "phi4", source: "provider_list" },
+    ]);
+    expect(impl.mock.calls[0][0]).toBe("http://127.0.0.1:11434/v1/models");
+  });
+
+  it("accepts a bare string entry, which some servers return", async () => {
+    const impl = vi.fn().mockResolvedValue(jsonResponse({ data: ["llama3.2", 42, ""] }));
+    await expect(adapterWith(impl).listModels()).resolves.toEqual([
+      { id: "llama3.2", source: "provider_list" },
+    ]);
+  });
+
+  it("returns an empty list, never a placeholder, when the shape is unknown", async () => {
+    const impl = vi.fn().mockResolvedValue(jsonResponse({ models: ["a"] }));
+    await expect(adapterWith(impl).listModels()).resolves.toEqual([]);
+  });
+
+  it("propagates an auth failure rather than reporting zero models", async () => {
+    // An empty list means "the server has none". A 401 means we never got to
+    // ask, and the UI must not present that as a factual model list.
+    const impl = vi.fn().mockResolvedValue(jsonResponse({}, 401));
+    await expect(adapterWith(impl).listModels()).rejects.toMatchObject({
+      code: "PROVIDER_AUTH_FAILED",
+    });
+  });
+
+  it("reports unreachable separately from rejected credentials", async () => {
+    const impl = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    await expect(adapterWith(impl).listModels()).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
+    });
+  });
+
+  it("sends the key as a bearer token only when one was stored", async () => {
+    const impl = vi.fn().mockResolvedValue(jsonResponse({ data: [] }));
+    await adapterWith(impl).listModels();
+    expect(impl.mock.calls[0][1].headers).toEqual({});
+
+    const impl2 = vi.fn().mockResolvedValue(jsonResponse({ data: [] }));
+    await adapterWith(impl2, { apiKey: "abc" }).listModels();
+    expect(impl2.mock.calls[0][1].headers).toEqual({ authorization: "Bearer abc" });
+  });
+});

@@ -1,134 +1,126 @@
-# ElevenLabs BYOK Local — 创作工具复刻
+# open11labs — ElevenLabs 创作工具的 BYOK 本地复刻
 
-> 当前开发范围与交接：见 [AGENTS.md](AGENTS.md)、[文档入口](docs/README.md)、[范围裁剪](specs/SCOPE.md)。**原站全部营销与账号相关内容已明确排除**；保留创作工具及本地BYOK配置。给实施Agent的启动提示词见 [GOAL_PROMPT.md](GOAL_PROMPT.md)。
->
-> 以下为既有首页原型的历史实现说明，不代表全站/BYOK后端已完成；后续以spec与实际验收记录为准。
+> 本仓库**不隶属于 ElevenLabs**，未复制其服务凭证、私有接口、专有字体或商标资产。
+> 模型推理仍需网络与用户自己的供应商账户；**没有任何专有模型被离线本地化**。
 
-对 `elevenlabs.io/app/home` 的 1:1 前端复刻，纯源码实现。
+对 `elevenlabs.io/app` 下**创作工具**的纯源码复刻，外加一套开源、自带密钥（BYOK）、
+本地运行的编排与存储层。**原站全部营销与账号相关内容已明确排除**：不做登录/注册/SSO、
+头像/个人资料、云工作区/成员/角色、订阅/付费墙/账单/积分、收益分成、市场曲目、
+商业授权申请、公开发布/分享、原站开发者与用量门户。保留创作工具与本地 BYOK 必需配置。
 
-**范围**：仅首页（App 外壳 + 首页内容）。营销横幅按要求不复刻。
+当前状态与交接见 [AGENTS.md](AGENTS.md)、[文档入口](docs/README.md)、
+[范围裁剪](specs/SCOPE.md)。实施启动提示词见 [GOAL_PROMPT.md](GOAL_PROMPT.md)，
+多 Agent 分区见 [COLLABORATION.md](docs/engineering/COLLABORATION.md)。
 
 ---
 
 ## 运行
 
+### 依赖
+
+Node **≥ 22**（本机实测 v26.7.0 使用 `node:sqlite`）。npm ≥ 10。
+
+### 开发（两进程）
+
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # 产物在 dist/
-npm run typecheck
+
+# 终端 1：本地 BYOK 服务端（loopback only）
+node server/cli.mjs --port 5174 --data ./data
+
+# 终端 2：前端
+npm run dev          # http://localhost:5173
 ```
 
-技术栈：Vite 7 + React 19 + TypeScript + Tailwind CSS v4。
+> **必须显式指定 `--port 5174`**：Vite 开发代理默认把 `/api` 转发到
+> `http://127.0.0.1:5174`，而 `server/cli.mjs` 不带参数时默认监听 **5173**。
+> 想换端口就设 `EL_API_TARGET=http://127.0.0.1:<port>` 启动 Vite。
+> **只跑 `npm run dev` 会得到一个所有 API 调用都失败的界面。**
 
----
-
-## 忠实度：实测对照表
-
-下表每一行都是用浏览器实测 `getBoundingClientRect()` 得到的，不是目测。
-
-| 测量项 | 真实站点 | 本复刻 | 状态 |
-|---|---|---|---|
-| 顶栏高度 | 50px（由开关按钮 y=5 h=40 反推） | 50px | ✅ |
-| 顶栏开关按钮位置 | x=10, y=5, 40×40 | x=10, y=5, 40×40 | ✅ 完全一致 |
-| 顶栏右侧铃铛 | x=909, y=7, 36×36 | 同上 | ✅ |
-| 侧边栏展开宽度 | 256px（由导航项 231px 反推） | 256px | ✅ |
-| 侧边栏导航项宽度 | 231px | 231px | ✅ 完全一致 |
-| 侧边栏导航项左边距 | x=12 | x=12 | ✅ |
-| 提示框内容区 x | 261 | 261 | ✅ 完全一致 |
-| 提示框内容区宽度 | 417 | 417 | ✅ 完全一致 |
-| 提示框最大宽度 | 650px | 650px | ✅ |
-| 提示框内容区高度 | 52px | 52px | ✅ |
-| 工具卡内容宽度 | 81px（点击区 97px） | 81px（点击区 97px） | ✅ |
-| 工具卡数量（宽屏） | 8 | 8 | ✅ |
-| 主内容左偏移（侧边栏展开） | — | 268px = 256 + 12(p-3) | ✅ |
-
-### 设计令牌
-
-`src/index.css` 中的所有数值均从生产样式表 `3b7xev0_eu9bg.css` 提取，非目测近似：
-
-- **灰阶** `--gray-50 … --gray-950`：22 级，裸 HSL 通道值（与原站一致，便于 `hsl(var(--x) / <alpha>)` 组合）
-- **透明灰** `--gray-alpha-50 … --gray-alpha-950`：22 级，8 位十六进制；浅色为黑低透明，深色为白低透明（`--darken-*` / `--lighten-*`）
-- **语义令牌**：`--background` `0 0% 100%`、`--foreground` `240 3% 6%`、`--secondary` → `darken-500`、`--subtle` → `darken-450`、`--border` → `gray-alpha-150`
-- **签名阴影** `--shadow-natural-xs`：`0 0 0 1px / 0 1px 1px -.5px / 0 3px 3px -1.5px`，全部 `#0000000f`
-- **自定义工具类**：`stack` `hstack` `center` `no-scrollbar` `scroll-subtle` `focus-ring` — 定义与原站逐条对齐
-
----
-
-## 美术资源：全部来自源站，非手绘
-
-字体和图标都是**从源站抓下来的真实资源**，不是自己画的。
-
-### 字体
-
-`public/fonts/` 下 4 个 woff2，共 161KB，从生产样式表
-`19le4vtp6prk5.css` 的 `@font-face` 声明里解析出真实 CDN 路径后下载：
-
-| 文件 | 字重 |
-|---|---|
-| `Waldenburg_Regular-s.p.43r3ozarrunyz.woff2` | 400 |
-| `Waldenburg_Medium-s.p.0dk8kt88f3bhr.woff2` | 500 |
-| `Waldenburg_Bold-s.p.3x8ofswqwnzku.woff2` | 700 |
-| `Waldenburg_Bold_SemiCondensed-s.p.1xwtlv9quw8fr.woff2` | 700 (HF) |
-
-### 图标
-
-`src/lib/icons.tsx` 是**生成文件**，23 个图标全部由工具从源站 JS bundle 里
-提取真实 path/circle 几何后产出：
+### 生产（单进程同源）
 
 ```bash
-node tools/fetch-bundles.mjs   # 下载两个图标库 bundle
-node tools/build-icons.mjs     # 生成 src/lib/icons.tsx
+npm start            # = npm run build && node server/cli.mjs
 ```
 
-站点有两套图标库，两套都已在工具里支持：
+静态产物与 API 同源，默认 <http://127.0.0.1:5173>。服务端**只绑定回环地址**，
+没有 `--host` 开关——把密钥金库暴露到局域网是本版本明确不做的事。
 
-| Bundle | 图标数 | 包装器 | 判定依据 |
-|---|---|---|---|
-| `1ez0d0on-xxdx.js` | 1816 | `width=18 viewBox="0 0 18 18"` + `strokeWidth 1.5` | `displayName="X"` |
-| `07el4lpsvg9qo.js` | 219 | `size`/`color` props，path 自带 `strokeWidth` | `"X",0,function({size:` |
-
-**图标归属经过真实 DOM 交叉验证**，不是按名字猜的：
-
-- 语音克隆 → `NavVoicesIcon`（真实 DOM 为 4 个 `<path>`，库内仅此图标元素数为 4 且视觉吻合）
-- 图像 → `ImageIcon`（真实 DOM 为 1 个 `<path>`，库内同为 1）
-- 更多 → `CircleEllipsisHorizontalIcon`（真实 DOM 为 1 path + 3 circle，提取结果完全一致）
-
-`tools/icon-sheet.mjs` 可把任意候选图标渲染成对照表，用于肉眼比对：
+### 校验
 
 ```bash
-node tools/icon-sheet.mjs tools/icons-bundle.js /tmp/sheet.html PlusIcon MicIcon ...
+npm run typecheck    # tsc -b --noEmit
+npm test             # vitest run
+npm run build
+```
+
+`npm test` 的**当前真实状态见 [交接检查点](docs/engineering/handoffs/2026-10-03-release-gate.md)**：
+331 个用例全部通过，但进程退出码为 **1**（12 个未处理 rejection，来自组件测试里的
+相对路径 fetch）。用例通过 ≠ 命令可用，这条不能含糊。
+
+---
+
+## 架构
+
+```
+浏览器 ──同源──> 本地服务端（loopback）
+                   ├── vault.mjs      write-only 密钥金库（save-only，永不回显）
+                   ├── jobs.mjs       持久任务队列（intentId 去重、崩溃安全状态机）
+                   ├── cost.mjs       成本账本（未知就写 unknown，不写 0）
+                   ├── assets.mjs     内容寻址素材库（从字节嗅探容器，不信客户端 MIME）
+                   ├── media.mjs      纯代码媒体分析（零 Provider 可用）
+                   ├── safe-fetch.mjs SSRF 防护（逐跳复验、私网/link-local 拒绝）
+                   └── ytdlp.mjs      yt-dlp 音频提取（数组传参，shell:false）
+                         │
+                         └──> 用户自己的 Provider（ElevenLabs / OpenAI 兼容 / 自托管）
+```
+
+密钥只在派发瞬间从金库解析，**绝不写入任务快照**。生产静态资源与 API 同源；
+Host/Origin/CSRF/会话校验不因为是 localhost 而省略。
+
+### 能力三态与费用
+
+能力一律标 `available` / `unavailable` / `unverified`。**未观察到的能力不得当作支持，
+未知的费用不得显示为 0。** 每个 Provider 适配器都返回带 `reason` 的能力项，
+成本以 `character-cost` 计量但不换算金额，除非有可核验的价格。
+
+---
+
+## 美术资源来源
+
+| 资源 | 来源 | 许可 |
+|---|---|---|
+| 图标几何 `src/lib/icons.tsx` | 从参考站渲染 UI 追踪 | **再分发状态未确认（D3，阻塞发布）** |
+| 字体 `public/fonts/Outfit-*.woff2` | Google Fonts Outfit | SIL OFL 1.1，见 `OFL-Outfit.txt` |
+
+原站专有的 **Waldenburg 字体已删除**，替换为度量相近的 OFL Outfit，
+字形偏差登记在 [`public/fonts/README.md`](public/fonts/README.md)。
+公开仓库不得携带不可再分发的专有字体。
+
+图标由 `tools/build-icons.mjs` 从 bundle 提取几何后生成，`src/lib/icons.tsx` 是生成文件：
+
+```bash
+node tools/fetch-bundles.mjs   # 下载图标库 bundle（已 gitignore，不入库）
+node tools/build-icons.mjs     # 重新生成 src/lib/icons.tsx
+node tools/icon-sheet.mjs tools/icons-bundle.js /tmp/sheet.html PlusIcon MicIcon
 ```
 
 ---
 
-## 已知边界（未还原部分）
+## 已知边界（尚未还原 / 未验证）
 
-## 目录结构
-
-```
-src/
-  index.css          设计令牌（灰阶/透明灰/语义/阴影/工具类）
-  fonts.css          Waldenburg 度量兼容回退
-  App.tsx            外壳：侧边栏 + 顶栏 + 内容偏移
-  components/
-    TopBar.tsx       顶栏（开关 / 标题 / 通知 / 头像）
-    Sidebar.tsx      可折叠侧边栏（主导航 + 已置顶）
-    HomePage.tsx     首页布局
-    PromptBar.tsx    提示输入栏（canvas 动态头像 + Alpha 徽章）
-    ToolGrid.tsx     8 个工具入口
-    RecentsPanel.tsx 最近 / 快速入门双标签 + 搜索 + 布局切换
-    AnimatedAvatar.tsx  canvas 多色渐变动效
-  data/              导航、工具、最近项数据
-  lib/icons.tsx      图标集（生成文件，勿手改）
-```
+- **M1-T07 真实 BYOK 链路未验证**：项目发起者未提供测试密钥与预算授权，
+  因此能力矩阵保持全 `unverified`，首条真实端到端链路（设钥匙→验证→TTS→提交→
+  播放→下载→历史→重启恢复）**没有实测证据**。
+- **聊天页未做浏览器端到端验证**：按发起者决定只保留自动化测试证据。
+- **逐控件视觉精确验收未完成**：`research/` 下的截图语料含账号标识，保持私有、
+  不随仓库分发；像素级比对需在受控环境内另行执行。
+- **图标授权未清**：见上表与 `docs/DECISIONS.md` D3。
+- m4a/ogg/flac 的时长解析**未实现**，返回 `null` 并说明未做猜测；压缩格式不做波形。
 
 ---
 
-## 下一步
+## 许可
 
-按你的节奏继续。可选方向：
-
-- 复刻「网格视图」与模板缩略图
-- 接 BYOK 层：把 `src/data/` 换成真实数据源
-- 复刻下一个页面（工作室 / 音色库 / Flows）
+自有代码 [MIT](LICENSE)。第三方资产按各自条款单列，**不并入 MIT**。
+本项目与 ElevenLabs 无隶属或背书关系。

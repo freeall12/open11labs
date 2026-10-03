@@ -5,7 +5,12 @@ import { TtsPage as TtsPageBody } from "@/features/voice/TtsPage";
 import { StsPage as StsPageBody } from "@/features/voice/StsPage";
 import { IsolatorPage as IsolatorPageBody } from "@/features/voice/IsolatorPage";
 import { DubbingPage as DubbingPageBody } from "@/features/voice/DubbingPage";
-import { YoutubeTranscription } from "@/features/voice/YoutubeTranscription";
+import { SttPage as SttPageBody } from "@/features/voice/SttPage";
+import { SpeakersPage as SpeakersPageBody } from "@/features/voice/SpeakersPage";
+import {
+  MyVoicesPage as MyVoicesPageBody,
+  VoiceLibraryPage as VoiceLibraryPageBody,
+} from "@/features/voice/VoiceLibraryPage";
 
 /* ==========================================================================
    VOICE module — voice library, cloning/design, TTS, STS, STT, isolation,
@@ -25,43 +30,50 @@ function page(id: string) {
 export function TtsPage() {
   const route = routeById("tts");
   if (!route) throw new Error("unknown route: tts");
-  return <PageFrame route={route}><TtsPageBody /></PageFrame>;
+  return <PageFrame route={route} compact><TtsPageBody /></PageFrame>;
 }
 
-export const VoiceLibraryPage = page("voices-explore");
-export const VoiceCreatePage = page("voice-create-query");
-export const InstantClonePage = page("instant-clone");
-export const VoiceDesignPage = page("voice-design");
-export const CreateVoiceAliasPage = page("voice-create-alias");
-export const MyVoicesPage = page("my-voices");
-export const VoiceCollectionPage = page("voice-collection");
-/** A local addition, not part of the upstream route set. */
-export function SttYoutubePage() {
+export function VoiceLibraryPage() {
+  const route = routeById("voices-explore");
+  if (!route) throw new Error("unknown route: voices-explore");
+  return <PageFrame route={route} bare><VoiceLibraryPageBody /></PageFrame>;
+}
+export const VoiceCreatePage = VoiceLibraryPage;
+export const InstantClonePage = VoiceLibraryPage;
+export const VoiceDesignPage = VoiceLibraryPage;
+export const CreateVoiceAliasPage = VoiceLibraryPage;
+export function MyVoicesPage() {
+  const route = routeById("my-voices");
+  if (!route) throw new Error("unknown route: my-voices");
+  return <PageFrame route={route} bare><MyVoicesPageBody /></PageFrame>;
+}
+export const VoiceCollectionPage = VoiceLibraryPage;
+export function SttPage() {
   const route = routeById("stt");
   if (!route) throw new Error("unknown route: stt");
-  return (
-    <PageFrame route={route}>
-      <YoutubeTranscription />
-    </PageFrame>
-  );
+  return <PageFrame route={route} bare><SttPageBody /></PageFrame>;
+}
+
+export function SpeakersPage() {
+  const route = routeById("speakers");
+  if (!route) throw new Error("unknown route: speakers");
+  return <PageFrame route={route} bare><SpeakersPageBody /></PageFrame>;
 }
 
 export function StsPage() {
   const route = routeById("sts");
   if (!route) throw new Error("unknown route: sts");
-  return <PageFrame route={route}><StsPageBody /></PageFrame>;
+  return <PageFrame route={route} compact><StsPageBody /></PageFrame>;
 }
 export function IsolatorPage() {
   const route = routeById("isolator");
   if (!route) throw new Error("unknown route: isolator");
-  return <PageFrame route={route}><IsolatorPageBody /></PageFrame>;
+  return <PageFrame route={route} compact><IsolatorPageBody /></PageFrame>;
 }
-export const SttPage = page("stt");
-export const SpeakersPage = page("speakers");
 export function DubbingPage() {
   const route = routeById("dubbing");
   if (!route) throw new Error("unknown route: dubbing");
-  return <PageFrame route={route}><DubbingPageBody /></PageFrame>;
+  return <PageFrame route={route} compact><DubbingPageBody /></PageFrame>;
 }
 export const AudioDetectorPage = page("audio-detector");
 

@@ -48,9 +48,33 @@ export const EXCLUDED_ROUTES = ALL_ROUTES.filter(
   (r) => r.disposition === "excluded",
 );
 
-/** Upstream URL not yet discovered. Blocked on research, not on guesswork. */
+/**
+ * Local dynamic routes.
+ *
+ * routes.json marks `studio-editor` as `path: null` because the upstream URL
+ * was never captured, and guessing one is forbidden. This build does have a
+ * studio editor — it is reached from a project the user just created, so its
+ * URL is derived from a real local id rather than invented from the upstream
+ * site. It is declared here, next to the other local-only routes, because it
+ * is a local decision and not a replica of an upstream path.
+ */
+export const LOCAL_DYNAMIC_ROUTES = [
+  { id: "studio-editor", pattern: "/app/studio/:id" },
+];
+
+/** Ids served by a local pattern, so they are not "awaiting evidence". */
+const LOCAL_ROUTE_IDS = new Set(LOCAL_DYNAMIC_ROUTES.map((r) => r.id));
+
+/**
+ * Upstream URL not yet discovered. Blocked on research, not on guesswork.
+ *
+ * Routes this build reaches through a locally-derived path are excluded:
+ * `studio-editor` is `path: null` upstream, but LOCAL_DYNAMIC_ROUTES below
+ * gives it a real local URL, so listing it as "awaiting evidence" would be
+ * false — and the sidebar renders this list verbatim as disabled rows.
+ */
 export const PENDING_ROUTES = ALL_ROUTES.filter(
-  (r) => !r.disposition && r.path === null,
+  (r) => !r.disposition && r.path === null && !LOCAL_ROUTE_IDS.has(r.id),
 );
 
 /** Query-state routes resolve to the page component of the same `owner`. */
@@ -67,6 +91,7 @@ export const QUERY_STATE_OWNER: Record<string, string> = {
   "video-mode": "image-video",
   "lipsync-mode": "image-video",
 };
+
 
 /**
  * Real navigable pages.

@@ -58,7 +58,7 @@
     {"id":"usage","path":"/app/developers/analytics/usage","disposition":"excluded","excludeReason":"云账户用量门户；本地费用另设","kind":"page","owner":"CORE","phase":"M4","coverage":"entry-only","evidence":["005-profile-menu"],"spec":"pages/assets-local.md"},
     {"id":"audio-detector","path":"/app/audio-detector","kind":"page","owner":"VOICE","phase":"M4","coverage":"entry-only","evidence":["005-profile-menu"],"spec":"pages/voice.md"},
     {"id":"local-provider-settings","path":"/local/settings/providers","kind":"local-extension","owner":"CORE","phase":"M1","coverage":"local-design","evidence":[],"spec":"pages/assets-local.md"},
-    {"id":"local-storage-settings","path":"/local/settings/storage","kind":"local-extension","owner":"STORAGE","phase":"M1","coverage":"local-design","evidence":[],"spec":"pages/assets-local.md"},
+    {"id":"local-storage-settings","path":"/local/settings/storage","kind":"local-extension","owner":"CORE","phase":"M1","coverage":"local-design","evidence":[],"spec":"pages/assets-local.md"},
     {"id":"local-jobs","path":"/local/jobs","kind":"local-extension","owner":"CORE","phase":"M1","coverage":"local-design","evidence":[],"spec":"pages/assets-local.md"}
   ]
 }
