@@ -33,15 +33,28 @@ export function useMediaDraft<T extends object>(key: string, initial: T) {
 
   const [value, setValue] = useState<T>(() => readDraft(storageKey, initial));
 
-  // The newest value is mirrored into a ref so unmount can flush it. Without
-  // this the debounced write below is cancelled by the effect cleanup, and the
-  // last edits before a navigation are the ones that vanish — which is exactly
-  // what happens when the user types a prompt and clicks the 历史 tab to look
-  // something up and comes back.
+  // A mode switch changes the key mid-mount (image → video → lipsync). Adopt
+  // the new key's own draft BEFORE any effect runs: otherwise the debounced
+  // write below would file the OLD mode's value under the NEW key, silently
+  // overwriting what that mode had saved. Render-phase adjustment, guarded so
+  // it re-runs only when the key actually changes.
+  const [prevKey, setPrevKey] = useState(storageKey);
+  if (prevKey !== storageKey) {
+    setPrevKey(storageKey);
+    setValue(readDraft(storageKey, initial));
+  }
+
+  // The newest value and key are mirrored into refs so an unmount can flush
+  // them; the cleanup must NOT read them, though; on a mode switch the refs
+  // already point at the NEW mode while the cleanup's closure holds the OLD
+  // key — mixing them files one mode's draft under the other's key.
   const latest = useRef(value);
   latest.current = value;
+  const keyRef = useRef(storageKey);
+  keyRef.current = storageKey;
 
   // Debounced so a slider drag or a fast typist does not write per keystroke.
+  // The closure always pairs this render's key with this render's value.
   useEffect(() => {
     const t = setTimeout(() => {
       try {
@@ -52,13 +65,31 @@ export function useMediaDraft<T extends object>(key: string, initial: T) {
     }, 250);
     return () => {
       clearTimeout(t);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(latest.current));
-      } catch {
-        /* Same reason as above; the in-memory value still drives the page. */
+      // Leaving this key (mode switch): flush the old pair so edits newer
+      // than the debounce interval are not lost. A plain value change does
+      // not flush — the next effect run re-schedules the write.
+      if (keyRef.current !== storageKey) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(value));
+        } catch {
+          /* Same reason as above. */
+        }
       }
     };
   }, [storageKey, value]);
+
+  // Flush whatever is current when the page unmounts — typing a prompt and
+  // clicking the 历史 tab to look something up must not lose the last edits.
+  useEffect(
+    () => () => {
+      try {
+        localStorage.setItem(keyRef.current, JSON.stringify(latest.current));
+      } catch {
+        /* Same reason as above; the in-memory value still drives the page. */
+      }
+    },
+    [],
+  );
 
   return [value, setValue] as const;
 }

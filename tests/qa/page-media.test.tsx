@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, cleanup, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { SfxPage } from "@/features/media/SfxPage";
@@ -449,21 +449,46 @@ describe("ImageVideoPage", () => {
     expect(state.created).toHaveLength(0);
   });
 
-  it("switching mode keeps the draft prompt and swaps in the video controls", async () => {
+  it("switching mode loads that mode's own draft and swaps in the video controls", async () => {
+    // This environment exposes no real localStorage; stand one up so the
+    // per-mode draft contract can be seeded and inspected.
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => void store.clear(),
+    });
+    try {
     const user = userEvent.setup();
     renderImageVideo();
     await screen.findByRole("radio", { name: "图像" });
 
-    await user.type(screen.getByLabelText("图像描述"), "我的草稿");
+    await user.type(screen.getByLabelText("图像描述"), "图像模式的草稿");
+    // Pre-seed what the video mode itself saved earlier, then switch.
+    globalThis.localStorage?.setItem?.(
+      "open11labs.draft:image-video:video",
+      JSON.stringify({ prompt: "视频模式的旧存稿" }),
+    );
     await user.click(screen.getByRole("radio", { name: "视频" }));
 
     expect(screen.getByRole("radio", { name: "视频" }).getAttribute("aria-checked")).toBe("true");
-    // The half-written prompt survives the switch: drafts are per-mode and
-    // persisted, and the composer stays mounted across the query-param change.
-    expect((screen.getByLabelText("视频描述") as HTMLTextAreaElement).value).toBe("我的草稿");
-    // The mode really changed: video-only controls are on the bar now.
+    // Each mode keeps its own draft: the switch adopts the video draft, it
+    // does NOT carry the image prompt over (and must not overwrite it either).
+    expect((screen.getByLabelText("视频描述") as HTMLTextAreaElement).value).toBe("视频模式的旧存稿");
     expect(screen.getByRole("button", { name: "时长" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "声音：关闭" })).toBeTruthy();
+
+    // Pollution regression: after the debounce fires, the image mode's stored
+    // draft still says exactly what the image mode typed.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    const stored = store.get("open11labs.draft:image-video:image");
+    expect(stored && JSON.parse(stored).prompt).toBe("图像模式的草稿");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("submits an image job and renders the returned image", async () => {
