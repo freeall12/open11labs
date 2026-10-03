@@ -1,24 +1,40 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TtsPage } from "@/features/voice/pages";
 import { VoicePicker } from "@/features/voice/VoicePicker";
 
 /* ==========================================================================
-   QA gap-fill: TTS page behaviour + voice picker states.
+   QA gap-fill: TTS page behaviour + voice picker states (UI-rewrite edition).
 
    Coverage target: the only fully implemented generation page at HEAD.
    tests/contract/routing.test.tsx proves each route renders *something*
    with an h1, but no existing test asserts any interactive behaviour:
      - the provider gate: no provider / unverified provider -> generation
        disabled with a reason and a link to local settings
+     - the honesty line ("能力未经真实调用核验") lives in the model dialog
+       now; there is no global capability notice any more, so the textarea
+       mounting is the page's "ready" signal in these tests
      - text-length states per model (over limit vs near limit)
-     - per-model parameter gating (unsupported sliders disabled and not sent)
+     - per-model parameter gating: 风格夸张 and 说话人增强 are v2.5/v3-only;
+       速度 is accepted by every model (the rewrite changed the matrix, the
+       assertions below pin the CURRENT one). Unsupported params are dropped
+       on submit, asserted end-to-end in the payload test.
      - the unknown-cost acknowledgement actually gating the submit button
-     - the submit payload: intent id shape, unsupported params dropped
-     - VoicePicker: needs-provider reason, search filter, selection, and the
-       "selected voice vanished" warning that must not auto-substitute
+     - the submit payload: intent id shape (provider:model:voice plus a
+       trailing content digest, so an edit gets a new id), unsupported params
+       dropped, and create followed by jobs.run (D-01 regression guard at
+       page level); the run's asset is surfaced as a player immediately
+     - the ⌘+Enter shortcut submits only a valid, acknowledged form
+     - voice selection happens through the 选择音色 modal: `voices.list`
+       must return real voice records (voiceId/name required) and clicking
+       a row commits it and closes the dialog. There is no manual-ID entry
+       in the dialog; that lives in the inline VoicePicker, which keeps its
+       own describe block below (including the 手动输入音色 ID details).
+     - VoicePicker (inline): needs-provider reason, search filter, selection,
+       and the "selected voice vanished" warning that must not auto-substitute
 
    Why the existing tests do not cover this: routing.test.tsx is render-only
    and no other *Page test exists. The @/lib/api module is mocked at the
@@ -60,7 +76,7 @@ const state = vi.hoisted(() => {
     makeProvider,
     makeJob,
     providers: [] as Record<string, unknown>[],
-    voices: { voices: [], reason: null, needsProvider: undefined } as Record<string, unknown>,
+    voices: { voices: [], reason: null } as Record<string, unknown>,
     created: [] as Record<string, unknown>[],
     runCalls: [] as string[],
     createImpl: null as null | ((input: Record<string, unknown>) => unknown),
@@ -140,27 +156,70 @@ function availableProvider(over: Record<string, unknown> = {}) {
   return state.makeProvider(over);
 }
 
+/** A voice record shaped like the real API returns (previewUrl may be null). */
+function makeVoice(over: Record<string, unknown> = {}) {
+  return {
+    voiceId: "voice_manual_1",
+    name: "晓晓",
+    category: "premade",
+    previewUrl: null,
+    labels: { zh: "female" },
+    availableForTiers: null,
+    unverified: true,
+    ...over,
+  };
+}
+
+const DIALOG_VOICE = makeVoice();
+
 beforeEach(() => {
+  // useDraft persists the form across mounts, and the page reads a
+  // sessionStorage handoff key: a stale draft would leak between tests.
+  // This jsdom build exposes only one of the two stores; clear what exists.
+  globalThis.localStorage?.clear();
+  globalThis.sessionStorage?.clear();
   state.providers = [];
-  state.voices = { voices: [], reason: null, needsProvider: undefined };
+  state.voices = { voices: [], reason: null };
   state.created = [];
   state.runCalls = [];
   state.createImpl = null;
 });
 
-const VOICE_OPTION = /手动输入音色 ID/;
-
 /** No jest-dom in this workspace: assert the DOM property directly. */
 const isDisabled = (el: Element) => (el as HTMLInputElement).disabled;
 
-async function pickVoiceManually(user: ReturnType<typeof userEvent.setup>, id: string) {
-  await user.click(screen.getByText(VOICE_OPTION));
-  await user.type(await screen.findByPlaceholderText("voice_xxxxxxxxxxxx"), id);
+/** The rewrite dropped the global capability notice; the textarea mounting is the ready signal. */
+async function waitForReady() {
+  await screen.findByRole("textbox", { name: "主文本区域" });
 }
 
 /** Interpolated JSX text spans several text nodes; match the whole body. */
 async function expectBodyText(substring: string) {
   await waitFor(() => expect(document.body.textContent).toContain(substring));
+}
+
+/** Open the 选择音色 modal and click a voice row; the row click commits and closes. */
+async function pickVoiceViaDialog(
+  user: ReturnType<typeof userEvent.setup>,
+  voice: { name: string },
+) {
+  await user.click(screen.getByRole("button", { name: "选择音色" }));
+  expect(await screen.findByRole("dialog", { name: "选择一个音色" })).toBeTruthy();
+  await user.click(await screen.findByRole("radio", { name: new RegExp(voice.name) }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "选择一个音色" })).toBeNull(),
+  );
+}
+
+/** Open the 选择模型 dialog and pick a model radio; the click commits and closes. */
+async function pickModelViaDialog(
+  user: ReturnType<typeof userEvent.setup>,
+  label: RegExp,
+) {
+  await user.click(screen.getByRole("button", { name: /选择模型/ }));
+  const dialog = await screen.findByRole("dialog", { name: "选择模型" });
+  await user.click(within(dialog).getByRole("radio", { name: label }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "选择模型" })).toBeNull());
 }
 
 describe("TtsPage provider gate", () => {
@@ -176,20 +235,27 @@ describe("TtsPage provider gate", () => {
     expect(screen.getByText("尚未配置 Provider")).toBeTruthy();
   });
 
-  it("with an unverified provider: state shown, voice picker disabled", async () => {
+  it("with an unverified provider: state shown, the voice pill is disabled", async () => {
     state.providers = [availableProvider({ validationState: "unverified" })];
     renderPage(<TtsPage />);
 
     await expectBodyText("当前密钥状态为「unverified」");
     expect(screen.getByText(/Provider 状态为「unverified」，请先在本地设置中验证/)).toBeTruthy();
-    // The picker must not offer voices for a key that has not been validated.
-    expect(isDisabled(screen.getByPlaceholderText(/按名称或 ID 搜索/))).toBe(true);
+    // The rail no longer embeds an inline picker: voice choosing goes through
+    // the 选择音色 pill, and it must not open for an unvalidated key.
+    expect(isDisabled(screen.getByRole("button", { name: "选择音色" }))).toBe(true);
   });
 
-  it("with an available provider: honesty notice instead of capability claims", async () => {
+  it("with an available provider: the model dialog carries the honesty line, not capability claims", async () => {
     state.providers = [availableProvider()];
     renderPage(<TtsPage />);
-    expect(await screen.findByText(/能力尚未经过真实 API 核验/)).toBeTruthy();
+    await waitForReady();
+
+    // The global "capability unverified" notice is gone; the honesty line now
+    // ships with every model entry instead of pretending a model is usable.
+    await userEvent.setup().click(screen.getByRole("button", { name: /选择模型/ }));
+    expect(await screen.findByRole("dialog", { name: "选择模型" })).toBeTruthy();
+    expect(screen.getAllByText(/能力未经真实调用核验/).length).toBeGreaterThan(0);
   });
 });
 
@@ -197,29 +263,34 @@ describe("TtsPage form validation", () => {
   it("an over-limit text blocks submission and names the model limit", async () => {
     const user = userEvent.setup();
     state.providers = [availableProvider()];
+    state.voices = { voices: [DIALOG_VOICE], reason: null };
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
     // Voice first: the gate reports the first unmet condition in order.
-    await pickVoiceManually(user, "voice_limit_1");
+    await pickVoiceViaDialog(user, DIALOG_VOICE);
     // Eleven v3 has the smallest limit (5000) among the models offered.
-    await user.selectOptions(screen.getByLabelText("模型"), "eleven_v3");
+    await pickModelViaDialog(user, /Eleven v3/);
     // Typing 5001 characters one by one is pointless; replace the value wholesale.
-    fireEvent.change(screen.getByLabelText("文本"), { target: { value: "a".repeat(5001) } });
+    fireEvent.change(screen.getByRole("textbox", { name: "主文本区域" }), {
+      target: { value: "a".repeat(5001) },
+    });
 
     expect(screen.getByText(/超出 Eleven v3 上限：当前 5001 \/ 5000 字符/)).toBeTruthy();
     expect(screen.getByText("文本超出所选模型上限")).toBeTruthy();
-    expect(isDisabled(screen.getByRole("button", { name: "生成语音" }))).toBe(true);
+    expect(isDisabled(screen.getByRole("button", { name: /生成语音/ }))).toBe(true);
   });
 
   it("a near-limit text warns but does not block", async () => {
+    const user = userEvent.setup();
     state.providers = [availableProvider()];
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
-    const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText("模型"), "eleven_v3");
-    fireEvent.change(screen.getByLabelText("文本"), { target: { value: "a".repeat(4800) } });
+    await pickModelViaDialog(user, /Eleven v3/);
+    fireEvent.change(screen.getByRole("textbox", { name: "主文本区域" }), {
+      target: { value: "a".repeat(4800) },
+    });
     expect(screen.getByText(/接近上限：4800 \/ 5000 字符/)).toBeTruthy();
     expect(screen.queryByText(/超出/)).toBeNull();
   });
@@ -228,37 +299,46 @@ describe("TtsPage form validation", () => {
     const user = userEvent.setup();
     state.providers = [availableProvider()];
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
-    // Multilingual v2 supports stability + similarity only.
+    // Slider order in the rail: 速度, 稳定性, 相似度, 风格夸张.
+    // Multilingual v2 accepts speed + stability + similarity; 风格夸张 is
+    // v2.5/v3-only.
     let sliders = screen.getAllByRole("slider");
     expect(sliders).toHaveLength(4);
-    expect(isDisabled(sliders[0])).toBe(false); // 稳定性
-    expect(isDisabled(sliders[1])).toBe(false); // 相似度
-    expect(isDisabled(sliders[2])).toBe(true); // 风格
-    expect(isDisabled(sliders[3])).toBe(true); // 语速
-    expect(isDisabled(screen.getByLabelText("说话人增强"))).toBe(true);
-    expect(screen.getAllByText("当前模型不支持该参数，不会发送。")).toHaveLength(2);
+    expect(isDisabled(sliders[0])).toBe(false); // 速度
+    expect(isDisabled(sliders[1])).toBe(false); // 稳定性
+    expect(isDisabled(sliders[2])).toBe(false); // 相似度
+    expect(isDisabled(sliders[3])).toBe(true); // 风格夸张
+    expect(screen.getAllByText("当前模型不支持该参数，不会发送。")).toHaveLength(1);
 
-    // Switching model re-enables what that model accepts.
-    await user.selectOptions(screen.getByLabelText("模型"), "eleven_turbo_v2_5");
-    sliders = screen.getAllByRole("slider");
-    expect(isDisabled(sliders[2])).toBe(false); // 风格
-    expect(isDisabled(sliders[3])).toBe(true); // 语速 stays v3/v4-only
-    expect(isDisabled(screen.getByLabelText("说话人增强"))).toBe(false);
+    // 说话人增强 lives in the collapsed 高级设置 block and follows the same matrix.
+    await user.click(screen.getByRole("button", { name: "高级设置" }));
+    expect(isDisabled(screen.getByRole("switch", { name: "说话人增强" }))).toBe(true);
+    expect(screen.getByText("当前模型不支持说话人增强，不会发送。")).toBeTruthy();
+
+    // Switching model re-enables what that model accepts (speed stays enabled
+    // for every model in the current matrix).
+    await pickModelViaDialog(user, /Eleven Flash v2\.5/);
+    expect(isDisabled(screen.getByRole("slider", { name: "风格夸张" }))).toBe(false);
+    expect(isDisabled(screen.getByRole("slider", { name: "速度" }))).toBe(false);
+    expect(isDisabled(screen.getByRole("switch", { name: "说话人增强" }))).toBe(false);
+    expect(screen.queryByText("当前模型不支持该参数，不会发送。")).toBeNull();
   });
 
   it("a Pro-gated output format blocks submission with a stated reason", async () => {
     const user = userEvent.setup();
     state.providers = [availableProvider()];
+    state.voices = { voices: [DIALOG_VOICE], reason: null };
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
-    await pickVoiceManually(user, "voice_format_1");
+    await pickVoiceViaDialog(user, DIALOG_VOICE);
+    await user.click(screen.getByRole("button", { name: "高级设置" }));
     await user.selectOptions(screen.getByLabelText("输出格式"), "pcm_44100");
     expect(screen.getByText(/本地无法确认当前密钥是否具备该格式权限/)).toBeTruthy();
     expect(screen.getByText("当前密钥不具备该输出格式所需权限")).toBeTruthy();
-    expect(isDisabled(screen.getByRole("button", { name: "生成语音" }))).toBe(true);
+    expect(isDisabled(screen.getByRole("button", { name: /生成语音/ }))).toBe(true);
   });
 });
 
@@ -266,11 +346,12 @@ describe("TtsPage submit flow", () => {
   async function fillValidForm() {
     const user = userEvent.setup();
     state.providers = [availableProvider()];
+    state.voices = { voices: [DIALOG_VOICE], reason: null };
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
-    await user.type(screen.getByLabelText("文本"), "  你好，世界  ");
-    await pickVoiceManually(user, "voice_manual_1");
+    await user.type(screen.getByRole("textbox", { name: "主文本区域" }), "  你好，世界  ");
+    await pickVoiceViaDialog(user, DIALOG_VOICE);
     await user.click(screen.getByRole("checkbox", { name: /我了解这次提交会产生费用/ }));
     return user;
   }
@@ -278,44 +359,67 @@ describe("TtsPage submit flow", () => {
   it("the acknowledgement checkbox gates the button on its own", async () => {
     const user = userEvent.setup();
     state.providers = [availableProvider()];
+    state.voices = { voices: [DIALOG_VOICE], reason: null };
     renderPage(<TtsPage />);
-    await screen.findByText(/能力尚未经过真实 API 核验/);
+    await waitForReady();
 
-    await user.type(screen.getByLabelText("文本"), "你好");
-    await pickVoiceManually(user, "voice_manual_1");
-    expect(isDisabled(screen.getByRole("button", { name: "生成语音" }))).toBe(true);
+    await user.type(screen.getByRole("textbox", { name: "主文本区域" }), "你好");
+    await pickVoiceViaDialog(user, DIALOG_VOICE);
+    // Text present -> the button reads 重新生成语音; it stays disabled without
+    // the cost acknowledgement either way.
+    expect(isDisabled(screen.getByRole("button", { name: /生成语音/ }))).toBe(true);
 
     await user.click(screen.getByRole("checkbox", { name: /我了解这次提交会产生费用/ }));
-    expect(isDisabled(screen.getByRole("button", { name: "生成语音" }))).toBe(false);
+    expect(isDisabled(screen.getByRole("button", { name: /生成语音/ }))).toBe(false);
   });
 
-  it("submits one intent with the trimmed text and only supported params", async () => {
+  it("submits one intent with the verbatim text and only supported params, then runs the job", async () => {
     const user = await fillValidForm();
-    await user.click(screen.getByRole("button", { name: "生成语音" }));
+    await user.click(screen.getByRole("button", { name: /生成语音/ }));
 
     await waitFor(() => expect(state.created).toHaveLength(1));
     const sent = state.created[0];
-    expect(sent.intentId).toBe("tts:p1:eleven_multilingual_v2:voice_manual_1");
+    // The id carries a trailing content digest so an edit can never silently
+    // collapse into the previous job; identical content keeps the same id
+    // (the dedup/reuse path is pinned in tests/qa/defect-regression.test.tsx).
+    expect(String(sent.intentId)).toMatch(
+      /^tts:p1:eleven_multilingual_v2:voice_manual_1:[0-9a-z]+$/,
+    );
     expect(sent.type).toBe("text_to_speech");
     expect(sent.modelId).toBe("eleven_multilingual_v2");
     // The draft text is sent verbatim, whitespace included: trimming here
     // would silently edit what the user asked to be read aloud.
     expect((sent.input as Record<string, unknown>).text).toBe("  你好，世界  ");
     const params = (sent.input as Record<string, unknown>).params as Record<string, unknown>;
-    expect(params.stability).toBe(0.5);
-    expect(params.similarity_boost).toBe(0.75);
-    // Multilingual v2 accepts neither style/speed nor speaker boost —
-    // they must be dropped, not forwarded to be rejected upstream.
+    expect(params).toEqual({ stability: 0.5, similarity_boost: 0.75, speed: 1 });
+    // Multilingual v2 accepts neither style nor speaker boost — they must be
+    // dropped, not forwarded to be rejected upstream. (Speed IS accepted by
+    // every model in the current matrix, so it stays.)
     expect(params).not.toHaveProperty("style");
-    expect(params).not.toHaveProperty("speed");
     expect(params).not.toHaveProperty("use_speaker_boost");
 
-    // The job panel appears with the local job, still a draft until run.
-    expect(await screen.findByText(/任务 draft/)).toBeTruthy();
+    // A create is followed by a run: the job must not sit in draft forever
+    // (D-01 regression guard at page level). The run's asset is surfaced
+    // immediately — a synchronous adapter finishes inside run(), and without
+    // this the player would never appear for it.
+    await waitFor(() => expect(state.runCalls).toEqual(["job_abcd1234"]));
+    expect(await screen.findByText(/任务 succeeded/)).toBeTruthy();
+    expect(await screen.findByText("out.mp3")).toBeTruthy();
+    expect(screen.getByText("下载音频")).toBeTruthy();
+  });
+
+  it("⌘+Enter submits the acknowledged, valid form", async () => {
+    const user = await fillValidForm();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "主文本区域" }), {
+      key: "Enter",
+      metaKey: true,
+    });
+    await waitFor(() => expect(state.created).toHaveLength(1));
+    expect(state.runCalls).toEqual(["job_abcd1234"]);
   });
 });
 
-describe("VoicePicker states", () => {
+describe("VoicePicker states (inline picker)", () => {
   const TWO_VOICES = {
     voices: [
       {
@@ -394,5 +498,26 @@ describe("VoicePicker states", () => {
     for (const radio of screen.getAllByRole("radio")) {
       expect(radio.getAttribute("aria-checked")).toBe("false");
     }
+  });
+
+  it("manual voice-ID entry stays available under 手动输入音色 ID", async () => {
+    const user = userEvent.setup();
+    // The input is controlled: the value has to be held somewhere, like the
+    // hosting page does, or React resets it to "" on every keystroke.
+    const seen: string[] = [];
+    function Holder() {
+      const [value, setValue] = useState("");
+      return <VoicePicker value={value} onChange={(v) => { seen.push(v); setValue(v); }} />;
+    }
+    state.voices = TWO_VOICES;
+    render(<Holder />);
+    await screen.findByRole("radio", { name: /Aria/ });
+
+    await user.click(screen.getByText("手动输入音色 ID"));
+    await user.type(await screen.findByPlaceholderText("voice_xxxxxxxxxxxx"), "voice_manual_9");
+    // One onChange per keystroke with the accumulated value; the last one is
+    // the full id the page would commit.
+    expect(seen.length).toBe("voice_manual_9".length);
+    expect(seen[seen.length - 1]).toBe("voice_manual_9");
   });
 });
