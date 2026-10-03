@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Notice } from "@/features/voice/ui";
 import { Link } from "react-router-dom";
 import {
@@ -104,14 +104,25 @@ export function YoutubeTranscription({
 
   // The host renders the submit button, so the gate result travels with it
   // instead of being duplicated — one source of truth for "can I submit".
+  // `run` goes through a ref so the published controls object keeps a stable
+  // identity: republishing a fresh object after every render would have the
+  // host setState → re-render → republish forever (maximum update depth).
+  const runRef = useRef<() => void>(() => {});
   useEffect(() => {
-    onControls?.({
-      run: () => void run(),
-      disabled: !!blocked || busy || !ackCost || !ackRights,
+    runRef.current = () => void run();
+  });
+  const controls = useMemo(() => {
+    const disabled = !!blocked || busy || !ackCost || !ackRights;
+    return {
+      run: () => runRef.current(),
+      disabled,
       busy,
       label: busy ? "下载并转写中…" : "下载并转写",
-    });
-  });
+    };
+  }, [blocked, busy, ackCost, ackRights]);
+  useEffect(() => {
+    onControls?.(controls);
+  }, [onControls, controls]);
 
   async function run() {
     if (!provider) return;
