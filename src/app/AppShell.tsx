@@ -24,7 +24,26 @@ export function AppShell() {
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
   );
-  const [railOpen, setRailOpen] = useState(true);
+  // A view preference, not data: the rail's open/closed choice survives a
+  // refresh (INTERACTIONS: 刷新可恢复), same as the sidebar's pin state.
+  const [railOpen, setRailOpen] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem("open11labs.pref:sidebar-rail");
+      return raw === null ? true : raw === "open";
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "open11labs.pref:sidebar-rail",
+        railOpen ? "open" : "closed",
+      );
+    } catch {
+      /* Private mode: the shell still works, the preference just resets. */
+    }
+  }, [railOpen]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { pathname } = useLocation();
 
