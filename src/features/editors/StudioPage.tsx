@@ -3,9 +3,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ApiError,
   assets as assetsApi,
+  jobs as jobsApi,
   projects as projectsApi,
+  providers as providersApi,
   type AssetRecord,
+  type JobRecord,
   type ProjectRecord,
+  type ProviderRecord,
 } from "@/lib/api";
 import { ArtifactList } from "@/features/media/ArtifactList";
 import { Modal } from "@/features/shared/Modal";
@@ -574,7 +578,24 @@ export function StudioEditorPage() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [provider, setProvider] = useState<ProviderRecord | null>(null);
+  const [providerLoading, setProviderLoading] = useState(true);
+  const [ackCost, setAckCost] = useState(false);
+  const [beatBusy, setBeatBusy] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await providersApi.list();
+        setProvider(list.find((p) => p.validationState === "available") ?? list[0] ?? null);
+      } catch {
+        setProvider(null);
+      } finally {
+        setProviderLoading(false);
+      }
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -635,6 +656,101 @@ export function StudioEditorPage() {
     const [moved] = next.splice(index, 1);
     next.splice(target, 0, moved);
     await saveBeats(next);
+  }
+
+  /**
+   * Beat-level generation for tts segments. The reference editor previews
+   * generated audio inline (047: 播放/倒退/快进/下载音频); this is the local
+   * equivalent for the single-beat case — run the job, keep the artifact on
+   * the beat, and play it with the browser's own audio element. A custom
+   * transport bar (倒退 10 秒 etc.) is queued, not claimed.
+   */
+  async function patchBeat(beatId: string, patch: Record<string, unknown>) {
+    const next = beats.map((b: { id: string }) => (b.id === beatId ? { ...b, ...patch } : b));
+    await saveBeats(next);
+  }
+
+  async function assetForJob(job: JobRecord): Promise<{ id: string; url: string; displayName: string } | null> {
+    if (!job.outputAssetIds?.length) return null;
+    const list = await assetsApi.list();
+    const hit = list.assets.find((a) => job.outputAssetIds.includes(a.id));
+    return hit ? { id: hit.id, url: hit.url, displayName: hit.displayName } : null;
+  }
+
+  async function refreshBeat(b: {
+    id: string;
+    jobId?: string;
+    status?: string;
+  }) {
+    if (!b.jobId) return;
+    setBeatBusy(b.id);
+    try {
+      const list = await jobsApi.list();
+      const job = list.find((j) => j.id === b.jobId);
+      if (!job) {
+        setNote("找不到对应任务，可能已被清理。");
+        return;
+      }
+      const asset = job.status === "succeeded" ? await assetForJob(job) : null;
+      await patchBeat(b.id, {
+        status: job.status,
+        ...(asset ? { assetId: asset.id, assetUrl: asset.url, assetName: asset.displayName } : {}),
+      });
+    } catch (err) {
+      setNote(err instanceof ApiError ? err.message : "查询任务失败");
+    } finally {
+      setBeatBusy(null);
+    }
+  }
+
+  async function runBeat(b: { id: string; text?: string; kind: string }) {
+    if (!provider || !b.text?.trim()) return;
+    setBeatBusy(b.id);
+    setNote(null);
+    try {
+      await patchBeat(b.id, { status: "running" });
+      const created = await jobsApi.create({
+        intentId: `studio:beat:${project!.id}:${b.id}:${b.text!.trim().length}:${provider.id}`,
+        type: "text_to_speech",
+        providerId: provider.id,
+        credentialRef: provider.id,
+        input: {
+          text: b.text,
+          voiceId: "",
+          outputFormat: "mp3_44100_128",
+          acknowledgeUnknownCost: true,
+        },
+      });
+      if (!created.created) {
+        setNote("与上次提交完全相同，已复用对应任务，不会重复计费。");
+        await patchBeat(b.id, { jobId: created.job.id, status: created.job.status });
+        await refreshBeat({ id: b.id, jobId: created.job.id });
+        return;
+      }
+      const out = await jobsApi.run(created.job.id);
+      const asset =
+        out.asset ??
+        (out.job.status === "succeeded" ? await assetForJob(out.job) : null);
+      if (!asset) {
+        await patchBeat(b.id, { jobId: created.job.id, status: out.job.status });
+        setNote(out.reason ?? "任务尚未完成，可用「重新查询」跟进。");
+        return;
+      }
+      await patchBeat(b.id, {
+        jobId: created.job.id,
+        status: "succeeded",
+        assetId: asset.id,
+        assetUrl: asset.url,
+        assetName: asset.displayName,
+      });
+      const a = await assetsApi.list();
+      setAssets(a.assets);
+    } catch (err) {
+      await patchBeat(b.id, { status: "failed" });
+      setNote(err instanceof ApiError ? err.message : "生成失败");
+    } finally {
+      setBeatBusy(null);
+    }
   }
 
   async function renameProject() {
@@ -740,6 +856,25 @@ export function StudioEditorPage() {
               {saving ?? `${beats.length} 段 · 修订 ${project.revision}`}
             </span>
           </h2>
+          {providerLoading ? (
+            <p className="text-xs text-subtle">正在读取本地 Provider…</p>
+          ) : !provider || provider.validationState !== "available" ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              没有可用的 Provider：段落可以编辑，但不能生成。
+              <Link to="/local/settings/providers" className="ml-1 underline">
+                去本地设置配置
+              </Link>
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-xs text-secondary">
+              <input
+                type="checkbox"
+                checked={ackCost}
+                onChange={(e) => setAckCost(e.target.checked)}
+              />
+              我了解「生成本段」会调用 {provider.displayName}，费用由该 Provider 计算，金额未知。
+            </label>
+          )}
           <button
             type="button"
             onClick={() => void addBeat()}
@@ -756,7 +891,20 @@ export function StudioEditorPage() {
           </p>
         ) : (
           <ol className="stack gap-2">
-            {beats.map((b: { id: string; name: string; kind: string; text?: string }, i: number) => (
+            {beats.map(
+              (
+                b: {
+                  id: string;
+                  name: string;
+                  kind: string;
+                  text?: string;
+                  jobId?: string;
+                  status?: string;
+                  assetUrl?: string;
+                  assetName?: string;
+                },
+                i: number,
+              ) => (
               <li
                 key={b.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-alpha-150 px-4 py-3"
@@ -833,8 +981,83 @@ export function StudioEditorPage() {
                     删除
                   </button>
                 </div>
+
+                {b.kind === "tts" && (
+                  <div className="stack w-full gap-2 border-t border-gray-alpha-100 pt-2">
+                    <label className="sr-only" htmlFor={`beat-text-${b.id}`}>
+                      第 {i + 1} 段旁白文本
+                    </label>
+                    <textarea
+                      id={`beat-text-${b.id}`}
+                      value={b.text ?? ""}
+                      onChange={(e) =>
+                        setProject({
+                          ...project,
+                          content: {
+                            ...project.content,
+                            beats: beats.map((x: { id: string }) =>
+                              x.id === b.id ? { ...x, text: e.target.value } : x,
+                            ),
+                          },
+                        })
+                      }
+                      onBlur={(e) => {
+                        const next = beats.map((x: { id: string }) =>
+                          x.id === b.id ? { ...x, text: e.target.value } : x,
+                        );
+                        if (next !== beats) void saveBeats(next);
+                      }}
+                      placeholder="这一段的旁白文本…"
+                      rows={2}
+                      className="focus-ring w-full resize-y rounded-lg border border-gray-alpha-150 bg-background p-2 text-sm outline-none"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void runBeat(b)}
+                        disabled={
+                          providerLoading ||
+                          !provider ||
+                          provider.validationState !== "available" ||
+                          !ackCost ||
+                          !b.text?.trim() ||
+                          beatBusy === b.id
+                        }
+                        className="focus-ring rounded-[10px] border border-gray-alpha-200 px-3 py-1 text-xs hover:bg-gray-alpha-50 disabled:opacity-40"
+                      >
+                        {beatBusy === b.id ? "生成中…" : "生成本段"}
+                      </button>
+                      {b.jobId && b.status !== "succeeded" && (
+                        <button
+                          type="button"
+                          onClick={() => void refreshBeat(b)}
+                          disabled={beatBusy === b.id}
+                          className="focus-ring rounded-[10px] border border-gray-alpha-200 px-3 py-1 text-xs hover:bg-gray-alpha-50 disabled:opacity-40"
+                        >
+                          重新查询
+                        </button>
+                      )}
+                      {b.status && (
+                        <span className="text-xs text-subtle">任务 {b.status}</span>
+                      )}
+                    </div>
+                    {b.assetUrl && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <audio controls preload="none" src={b.assetUrl} className="h-9 w-full max-w-md" />
+                        <a
+                          href={b.assetUrl}
+                          download={b.assetName ?? "studio-beat.mp3"}
+                          className="focus-ring rounded-[10px] border border-gray-alpha-200 px-2.5 py-1 text-xs hover:bg-gray-alpha-50"
+                        >
+                          下载音频
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
-            ))}
+              ),
+            )}
           </ol>
         )}
       </section>
