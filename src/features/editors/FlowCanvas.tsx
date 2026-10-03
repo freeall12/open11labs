@@ -1758,7 +1758,7 @@ function GenerateBody({
           onFocus={onEditStart}
           onBlur={onEditEnd}
           onPointerDown={stop}
-          aria-label={`${node.label} 比例`}
+          aria-label={`${node.label} 纵横比`}
           className="focus-ring appearance-none rounded bg-transparent text-xs outline-none"
         >
           {RATIOS.map((r) => (
@@ -1876,7 +1876,7 @@ function NodeMenu({
         { label: "批注", onSelect: onComment },
         { label: "删除节点", onSelect: onRemove, danger: true, separated: true },
       ]}
-      triggerLabel={`${label} 更多`}
+      triggerLabel={`${label} 更多选项`}
       align="right"
       width="min-w-40"
       trigger={<Dots />}
