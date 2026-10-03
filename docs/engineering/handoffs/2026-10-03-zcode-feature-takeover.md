@@ -1,0 +1,22 @@
+# FEATURE 轨道接替交接 — ZCode(2026-10-03 14:52 用户指令)
+
+- 角色/目录/分支:ZCode 接替为 FEATURE 写手+集成者,主工作树 main;QA worktree(zcode/qa)保留为验证环境
+- 需求/验收ID:R2/R3/R4(BYOK 端到端)、R1-AC02(控件)、M5-T12
+- 提交链(本日 ZCode 侧):
+  - `f2c7246` 保护性集成 minimax 在途批次(264 文件/+22602,内容原样;自验 333 用例绿;assets 解除跟踪)
+  - `2d7f188` merge zcode/qa(setup.ts 冲突取集成者 stub 表版本)
+  - `e03253f` D-05 会话复用(server/index.mjs;标记翻正+写探针)
+  - `e1880f2` 本地 TTS 端到端:D-01(create→run+同步产物直显+去重提示)、D-02(submitTextToSpeech→/v1/audio/speech+能力表+runner 显式分发+ElevenLabs 别名)、D-06(音色弹层手动 ID 入口)、intentId 内容哈希;附 local-tts-e2e.test.mjs
+  - `9293688` YoutubeTranscription onControls 无限发布循环修复(run 经 ref+controls 记忆化)+回归;page-voice-tools 适配(19)
+  - `08ea7a1` page-tts 适配(15→17,⌘+Enter/手动 ID 用例)+D-01/D-02 标记翻正钉死
+  - `b6c0675` page-media 适配(13)
+  - `e0e64a2` 跨模式草稿隔离修复(双方向污染)
+- 验证(实测/模拟分类):
+  - `npm run typecheck`/`npm run build` exit 0;`npm test` **433/433(28 文件)** exit 0
+  - 浏览器端到端(本机 5188+mock 5190,Provider 经 API 注册):TTS 提交→/v1/audio/speech 命中→WAV 产物→播放器+speech.mp3 下载;截图 out/qa-feature-tts-e2e-3.png;mock 请求日志佐证 chat 端点 0 次
+  - 会话复用:defect-regression-server 翻正+26 项安全负例无回归
+- 是否修改Provider/费用/持久化/秘密处理:是——本地适配器新增 TTS 能力(unverified 标注);session 复用不改变 CSRF 语义;草稿仍不含密钥
+- 排除范围检查:无营销/账户入口混入;routes.json 仅做过试探性增删(最终与设计一致,无 stt-youtube 独立路由)
+- 产品侧疑点移交(子智能体报告,未处理):ModelDialog 手写遮罩无 Esc/焦点圈定;⌘+Enter 监听无依赖数组;STS 空队列"0 个文件"文案;needs-approval 维度移除待 spec 确认;useDraft 卸载后防抖写时序
+- 未完成/阻塞:真实供应商生成 unverified(用户不提供密钥);D3 图标授权、发布授权待用户;gaps.md 剩余(首页死控件群/持久化抽查/测试 ID)在队列
+- 外部协作:每 15 分钟循环继续监测 minimax 复活(冻结中);发现复活将警报并请用户裁决单写手归属

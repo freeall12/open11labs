@@ -55,12 +55,12 @@
 | M1-T04 Provider 适配 | 部分（适配器/契约/fixture 落地；能力全标 unverified） | `tests/contract/providers.test.mjs` |
 | M1-T05 任务/成本 | 完成（42 项，含跨重启恢复） | `tests/contract/jobs.test.mjs` |
 | M1-T06 存储/工程 | 完成（23 项 + 变体派生 7 项） | `tests/contract/storage.test.mjs`、`variants.test.mjs` |
-| M1-T07 首条 BYOK 链（TTS） | 代码完成；真实提交需用户密钥+预算 | `tests/contract/*`、handoffs |
+| M1-T07 首条 BYOK 链（TTS） | 托管链路代码完成（真实提交需用户密钥）；**自托管链路已端到端打通**（2026-10-03：mock /v1/audio/speech 实测产物+浏览器播放/下载） | `tests/qa/local-tts-e2e.test.mjs`、out/qa-feature-tts-e2e-3.png |
 | M2-T08 音频工具 | **完成（代码层）**：TTS/STS/分离/配音/STT/说话者/音色库/创建克隆设计/试听条；真实调用待密钥 | handoffs/2026-10-03-parallel-integration.md |
 | M2-T09 媒体工具 | **完成（代码层）**：音效/音乐/图像视频口型/全部历史收藏/音频检测 | 同上 |
 | M3-T10 Studio/Flows/聊天 | 进行中（聊天已实现；Studio/Flows 待做） | `src/features/editors` |
 | M4-T11 有声书/其余 | **完成（代码层）**：有声书分章生成导出 + 品牌套件 | 同上 |
-| M5-T12 QA | 持续（331 项通过） | `npm test` |
+| M5-T12 QA | 持续（**433 项通过**，28 文件；D-01/D-02/D-05 已修复并钉回归，页面测试已适配新 UI） | `npm test` |
 | M5-T13 发布/许可 | 未开始（D2 许可证待用户确认） | `docs/DECISIONS.md` |
 
 ## 外部阻塞（不伪造、不越权）
@@ -70,3 +70,7 @@
 - **D2 开源许可证**：需用户确认。未经确认不发布、不 push。
 - **研究补采**：`studio-editor`、`templates-tool`、`audio-native`、`productions`、
   `ads-engine` 五条 `path:null`，按 `routes.json` 规则**不猜 URL**。
+
+## 2026-10-03 15:40 接替记录
+
+用户 14:52 指令 ZCode 接替逐页复刻任务(FEATURE 写手+集成者)。当日:保护性集成 minimax 在途批次(f2c7246)、合并 QA 分支、修复 D-01/D-02/D-05/D-06+onControls 循环+跨模式草稿污染,本地自托管 TTS 端到端可用(浏览器实测),全量 433/433。详见 handoffs/2026-10-03-zcode-feature-takeover.md。
