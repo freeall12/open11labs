@@ -169,16 +169,19 @@ function ComposerPanel() {
   }, []);
 
   /**
-   * Music generation is not implemented in the provider adapter. The reason is
-   * stated unconditionally above the composer, so it is visible before the
-   * user types anything; `blocked` only adds the input-level reason. The page
-   * never routes the request to a different task type.
+   * Music generation follows the documented POST /v1/music/compose: prompt or
+   * composition_plan, music_length_ms, model_id. It is 文档验证 only — no
+   * authenticated call has been made, the endpoint is paid-tier, and page
+   * parameters without a documented field (variants, lyricsMode) stay in the
+   * local job record instead of being invented upstream.
    */
   const blocked = !prompt.trim() && !lyrics.trim()
     ? "请输入描述，或切换到「歌词」直接写词"
     : !provider
       ? "尚未配置 Provider"
-      : "输入已就绪，但本地适配器未实现音乐生成，提交按钮仍保持关闭";
+      : includeLyrics && lyricsMode === "自定义" && lyrics.trim() && durationSeconds === null
+        ? "自定义歌词需要确定时长（composition plan 按文档携带 durationMs）"
+        : null;
 
   async function submit() {
     if (!provider) return;
@@ -222,9 +225,9 @@ function ComposerPanel() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <div className="stack gap-3">
         <Notice tone="warn">
-          本地 Provider 适配器未实现音乐生成（music generation）任务，提交会被服务端拒绝。
-          本页不伪造结果，也不改投其它任务类型；下面所有参数仍会完整写进本地任务记录，
-          等适配器补齐后即可提交。
+          音乐生成按官方文档 POST /v1/music/compose 实现（文档验证；该端点为付费档位，未经真实调用核验）。
+          仅发送文档字段：描述（或自定义歌词组成的 composition plan）、时长、模型；
+          变体数与歌词模式没有公开字段，保留在本地任务记录中，不会编造上传。
         </Notice>
         <div className="flex flex-wrap items-center gap-2">
           <Popover
@@ -691,8 +694,8 @@ function SavedTracks() {
         empty="还没有保存任何歌曲。生成后点星标即可保存，方便下次找到。"
       />
       <p className="text-xs text-subtle">
-        已保存按本地收藏标记统计，不会上传到任何账户。本应用目前还不能生成音乐，
-        所以这里只会出现你在其他页面收藏的本地音频。
+        已保存按本地收藏标记统计，不会上传到任何账户。音乐生成已按文档接入（未核验），
+        这里列出你在本地收藏的音频。
       </p>
     </section>
   );

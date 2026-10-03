@@ -531,6 +531,15 @@ export class JobRunner {
           inputMime: job.input.mimeType,
         });
       }
+      case "music_generation":
+        return adapter.submitMusic({
+          key,
+          prompt: job.input.prompt,
+          lyrics: job.input.lyrics,
+          includeLyrics: job.input.includeLyrics !== false,
+          durationSeconds: job.input.durationSeconds,
+          modelId: job.modelId ?? undefined,
+        });
       case "sound_generation":
         return adapter.submitSfx({
           key,

@@ -144,12 +144,16 @@ describe("capabilities are never claimed as available without a real run", () =>
     const fake = stub({ body: modelsResponse });
     const caps = await adapterWith(fake).listCapabilities(KEY);
 
-    expect(caps.length).toBe(4);
+    // 4 catalogue models + the static music entry (its own documented
+    // endpoint, not part of /v1/models).
+    expect(caps.length).toBe(5);
     for (const c of caps) {
       expect(c.availability).toBe("unverified");
       expect(c.reason).toBeTruthy();
       expect(c.providerId).toBe(PROVIDER_ID);
     }
+    const music = caps.find((c) => c.taskType === "music_generation");
+    expect(music?.modelId).toBe("music_v2_5");
   });
 
   it("uses the API model id, never the display name", async () => {

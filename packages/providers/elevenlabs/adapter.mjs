@@ -255,7 +255,7 @@ export class ElevenLabsAdapter {
       ];
     }
 
-    return models.map((m) => {
+    const fromModels = models.map((m) => {
       const taskType = MODEL_TASKS[m?.category] ?? "text_to_speech";
       return capability({
         providerId: PROVIDER_ID,
@@ -272,6 +272,23 @@ export class ElevenLabsAdapter {
         supportsIdempotency: false,
       });
     });
+    // Music composition is its own documented endpoint rather than part of the
+    // /v1/models catalogue mapping, so it is advertised alongside, unverified.
+    fromModels.push(
+      capability({
+        providerId: PROVIDER_ID,
+        modelId: "music_v2_5",
+        displayName: "Music v2.5",
+        taskType: "music_generation",
+        availability: "unverified",
+        reason: "POST /v1/music/compose 已按公开文档实现；付费档位端点，未经真实调用核验",
+        supportsStreaming: false,
+        supportsCancel: false,
+        supportsStatusQuery: false,
+        supportsIdempotency: false,
+      }),
+    );
+    return fromModels;
   }
 
   /**
@@ -368,6 +385,66 @@ export class ElevenLabsAdapter {
       // Character cost is a metering signal, not a price. It is recorded as
       // usage; it is never converted into money here.
       characterCost: out.characterCost,
+    };
+  }
+
+  /**
+   * Music composition — POST /v1/music/compose (documented; paid-tier).
+   *
+   * Only fields the public docs name are sent: `prompt` OR `composition_plan`,
+   * `music_length_ms`, `model_id`. Custom lyrics travel as the documented
+   * composition-plan chunk shape; page-side parameters with no public field
+   * (variants, lyricsMode) stay in the local job record and are NOT forwarded.
+   * No authenticated call has ever been made — this stays unverified.
+   */
+  async submitMusic({ key, prompt, lyrics, includeLyrics, durationSeconds, modelId }) {
+    const model = modelId ?? "music_v2_5";
+    const ms = typeof durationSeconds === "number" ? Math.round(durationSeconds * 1000) : null;
+
+    let body;
+    if (includeLyrics && lyrics?.trim()) {
+      if (ms === null) {
+        throw normalizedError({
+          code: "VALIDATION_ERROR",
+          safeMessage: "自定义歌词需要确定时长,才能构建文档定义的 composition plan",
+          retryable: false,
+          submissionCertainty: "not_submitted",
+        });
+      }
+      body = {
+        composition_plan: { chunks: [{ text: lyrics, durationMs: ms }] },
+        model_id: model,
+        music_length_ms: ms,
+      };
+    } else {
+      if (!prompt?.trim()) {
+        throw normalizedError({
+          code: "VALIDATION_ERROR",
+          safeMessage: "请输入音乐描述",
+          retryable: false,
+          submissionCertainty: "not_submitted",
+        });
+      }
+      body = { prompt: prompt.trim(), model_id: model };
+      if (ms !== null) body.music_length_ms = ms;
+    }
+
+    const out = await this.#request({
+      method: "POST",
+      path: "/v1/music/compose",
+      key,
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json", accept: "audio/mpeg" },
+      expect: "binary",
+    });
+
+    return {
+      artifact: {
+        bytes: out.bytes,
+        contentType: out.contentType ?? "audio/mpeg",
+        suggestedName: `music-${Date.now()}.mp3`,
+      },
+      providerRequestId: out.requestId,
     };
   }
 
