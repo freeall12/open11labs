@@ -298,3 +298,9 @@
 - 最终验证:typecheck/build 0,全量 433/433(28 文件);文档提交 106dca5(FEATURE 接替 handoff+GOAL 台账)
 - 当日 ZCode 提交链:f2c7246→2d7f188→e03253f→e1880f2→9293688→08ea7a1→b6c0675→e0e64a2→106dca5
 - 外部:无 minimax 复活;下循环进入队列推进(gaps.md 死控件/疑点)
+
+## 2026-10-03 15:38 FEATURE循环#2
+
+- 外部:无 minimax 复活
+- 本轮推进:gaps#1(首页死控件群)核实为集成批次已解决并闭环记录;gaps#4 残留(桌面 rail 开合不持久化)已修——AppShell 偏好读写+shell-prefs 双向测试;全量 435/435 绿后提交
+- 队列剩余:数值上限硬编码标注(#7)、测试ID 普及(#6)、口型同步待适配器(诚实拒绝中)、needs-approval spec 确认、ModelDialog Esc/焦点圈定、逐页视觉精修
