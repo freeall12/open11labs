@@ -571,7 +571,6 @@ function TableList({ ctl }: { ctl: FilesController }) {
           <th scope="col" className="py-2.5 text-left font-normal">已添加</th>
           <th scope="col" className="py-2.5 text-left font-normal">类型</th>
           <th scope="col" className="py-2.5 text-left font-normal">文件大小</th>
-          <th scope="col" className="py-2.5"><span className="sr-only">操作</span></th>
         </tr>
       </thead>
       <tbody>
@@ -588,7 +587,6 @@ function TableList({ ctl }: { ctl: FilesController }) {
             <td className="py-4 text-secondary">—</td>
             <td className="py-4 text-secondary">文件夹</td>
             <td className="py-4 text-secondary">—</td>
-            <td className="py-4" />
           </tr>
         ))}
 
@@ -623,7 +621,6 @@ function TableList({ ctl }: { ctl: FilesController }) {
             <td className="py-4 text-secondary">—</td>
             <td className="py-4 text-secondary">文件夹</td>
             <td className="py-4 text-secondary">—</td>
-            <td className="py-4" />
           </tr>
         )}
       </tbody>
@@ -634,14 +631,38 @@ function TableList({ ctl }: { ctl: FilesController }) {
 function AssetRow({ ctl, asset }: { ctl: FilesController; asset: AssetRecord }) {
   const confirming = ctl.confirmDelete === asset.id;
   return (
-    <tr className="border-b border-gray-alpha-50">
+    // Actions live inside the 名称 cell and reveal on row hover/focus, the
+    // reference's four-column shape (069) — no fifth 操作 column.
+    <tr className="group border-b border-gray-alpha-50">
       <td className="py-4 pr-3">
         <span className="flex min-w-0 items-center gap-2.5">
           <RowIcon kind={iconKind(asset.mediaType)} />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-foreground">{asset.displayName}</span>
             {asset.licenseSource && (
               <span className="block truncate text-xs text-subtle">{asset.licenseSource}</span>
+            )}
+          </span>
+          <span className="ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {confirming ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void ctl.remove(asset.id)}
+                  className="focus-ring rounded-[10px] px-1.5 py-1 text-[13px] text-red-700 hover:bg-gray-alpha-50"
+                >
+                  确认删除
+                </button>
+                <button
+                  type="button"
+                  onClick={() => ctl.setConfirmDelete(null)}
+                  className="focus-ring rounded-[10px] px-1.5 py-1 text-[13px] text-secondary hover:bg-gray-alpha-50"
+                >
+                  取消
+                </button>
+              </>
+            ) : (
+              <RowMenu ctl={ctl} asset={asset} />
             )}
           </span>
         </span>
@@ -649,28 +670,6 @@ function AssetRow({ ctl, asset }: { ctl: FilesController; asset: AssetRecord }) 
       <td className="py-4 text-secondary">{formatAdded(asset.createdAt)}</td>
       <td className="py-4 text-secondary">{typeLabel(asset.mediaType)}</td>
       <td className="py-4 text-secondary">{formatBytes(asset.byteSize)}</td>
-      <td className="py-4 text-right">
-        {confirming ? (
-          <span className="flex items-center justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => void ctl.remove(asset.id)}
-              className="focus-ring rounded-[10px] px-1.5 py-1 text-[13px] text-red-700 hover:bg-gray-alpha-50"
-            >
-              确认删除
-            </button>
-            <button
-              type="button"
-              onClick={() => ctl.setConfirmDelete(null)}
-              className="focus-ring rounded-[10px] px-1.5 py-1 text-[13px] text-secondary hover:bg-gray-alpha-50"
-            >
-              取消
-            </button>
-          </span>
-        ) : (
-          <RowMenu ctl={ctl} asset={asset} />
-        )}
-      </td>
     </tr>
   );
 }
